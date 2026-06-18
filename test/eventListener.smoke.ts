@@ -13,7 +13,7 @@ const tagsByLead = new Map<string, string[]>([
   const leadId = leadIdMatch ? leadIdMatch[1] : null;
   if (!leadId) return { ok: true, json: async () => ({}) };
 
-  if (init?.method === 'POST' && url.endsWith('/tags')) {
+  if (init?.method === 'PUT') {
     const body = JSON.parse(init.body ?? '{}') as { tags: string[] };
     tagsByLead.set(leadId, body.tags);
     return { ok: true, json: async () => ({}) };

@@ -6,7 +6,7 @@ let mockTags: string[] = ['Website Lead', 'High Intent'];
 process.env.LOFTY_API_KEY = 'mock-key';
 
 (globalThis as any).fetch = async (url: string, init?: { method?: string; body?: string }) => {
-  if (init?.method === 'POST' && url.endsWith('/tags')) {
+  if (init?.method === 'PUT') {
     const body = JSON.parse(init.body ?? '{}') as { tags: string[] };
     mockTags = body.tags;
     return { ok: true, json: async () => ({}) };

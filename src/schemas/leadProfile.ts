@@ -16,7 +16,7 @@
  * key off this distinction.
  */
 export interface TouchEvent {
-  type: 'call' | 'note' | 'email_reply' | 'email_open' | 'property_view' | 'list_sync';
+  type: 'call' | 'note' | 'email_reply' | 'email_open' | 'sms_reply' | 'property_view' | 'list_sync';
   timestamp: string;
   isHuman: boolean;
 }
@@ -199,7 +199,7 @@ interface LoftyNote {
   isSystemGenerated?: boolean;
 }
 
-// GET /v1.0/communication/call-history?leadId={leadId}
+// GET /v1.0/communication/call?leadId={leadId} — { calls: [...] }
 interface LoftyCallHistoryItem {
   callTime?: string | number;
 }
@@ -209,6 +209,14 @@ interface LoftyEmailHistoryItem {
   sentTime?: string | number;
   isReply?: boolean;
   opened?: boolean;
+}
+
+// GET /v1.0/communication/text?leadId={leadId} — { texts: [...] }. Only
+// inbound texts count as a touch — an outbound "Delivered" text just
+// confirms Vern's own send went through, not that the lead engaged.
+interface LoftyTextHistoryItem {
+  textTime?: string | number;
+  direction?: 'Inbound' | 'Outbound';
 }
 
 // GET /v2.0/leads/{leadId}/activities — a generic timeline that can contain
@@ -291,6 +299,7 @@ function buildTouchHistory(
   callHistory: LoftyCallHistoryItem[],
   emailHistory: LoftyEmailHistoryItem[],
   activities: LoftyActivityItem[],
+  textHistory: LoftyTextHistoryItem[] = [],
 ): TouchEvent[] {
   const events: TouchEvent[] = [];
 
@@ -314,6 +323,13 @@ function buildTouchHistory(
     } else if (email.opened) {
       events.push({ type: 'email_open', timestamp, isHuman: false });
     }
+  }
+
+  for (const text of textHistory) {
+    if (text.direction !== 'Inbound') continue;
+    const timestamp = toIsoString(text.textTime);
+    if (!timestamp) continue;
+    events.push({ type: 'sms_reply', timestamp, isHuman: true });
   }
 
   for (const activity of activities) {
@@ -356,8 +372,8 @@ function computeEngagement(touchHistory: TouchEvent[]): LeadEngagement {
 
 /**
  * Normalizes a raw Lofty lead plus its notes, call history, email history,
- * and activity timeline into the LeadProfile contract consumed by
- * downstream agents.
+ * text history, and activity timeline into the LeadProfile contract
+ * consumed by downstream agents.
  */
 export function normalizeLeadProfile(
   loftyLead: LoftyLead,
@@ -365,11 +381,12 @@ export function normalizeLeadProfile(
   callHistory: LoftyCallHistoryItem[] = [],
   emailHistory: LoftyEmailHistoryItem[] = [],
   activities: LoftyActivityItem[] = [],
+  textHistory: LoftyTextHistoryItem[] = [],
 ): LeadProfile {
   const hasAddress =
     loftyLead.streetAddress || loftyLead.city || loftyLead.state || loftyLead.zipCode;
 
-  const touchHistory = buildTouchHistory(notes, callHistory, emailHistory, activities);
+  const touchHistory = buildTouchHistory(notes, callHistory, emailHistory, activities, textHistory);
 
   return {
     leadId: String(loftyLead.leadId),

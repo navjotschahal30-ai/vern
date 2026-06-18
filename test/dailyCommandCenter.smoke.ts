@@ -105,7 +105,7 @@ addLead('D1', { source: 'Website', firstName: 'Dnc-D1', phones: ['555-0400'], le
   const leadId = pathMatch ? pathMatch[1] : queryMatch ? queryMatch[1] : null;
   const lead = leadId ? leads.get(leadId) : undefined;
 
-  if (init?.method === 'POST' && url.endsWith('/tags') && lead) {
+  if (init?.method === 'PUT' && lead) {
     const body = JSON.parse(init.body ?? '{}') as { tags: string[] };
     lead.tags = body.tags;
     return { ok: true, json: async () => ({}) };
@@ -114,8 +114,9 @@ addLead('D1', { source: 'Website', firstName: 'Dnc-D1', phones: ['555-0400'], le
   if (!lead) return { ok: true, json: async () => ({}) };
 
   if (url.includes('/notes')) return { ok: true, json: async () => ({ notes: lead.notes }) };
-  if (url.includes('/communication/call-history')) return { ok: true, json: async () => ({ callHistory: [] }) };
+  if (url.includes('/communication/call')) return { ok: true, json: async () => ({ calls: [] }) };
   if (url.includes('/communication/email')) return { ok: true, json: async () => ({ emails: [] }) };
+  if (url.includes('/communication/text')) return { ok: true, json: async () => ({ texts: [] }) };
   if (url.includes('/activities')) return { ok: true, json: async () => ({ activities: [] }) };
 
   return { ok: true, json: async () => ({ lead: { ...lead.raw, tags: lead.tags.map((t) => ({ tagName: t })) } }) };

@@ -24,19 +24,20 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
   try {
     const headers = getLoftyHeaders();
 
-    const [leadData, notesData, callHistoryData, emailHistoryData, activitiesData] = await Promise.all([
+    const [leadData, notesData, callHistoryData, emailHistoryData, activitiesData, textHistoryData] = await Promise.all([
       fetchJson<{ lead: NormalizeArgs[0] }>(`https://api.lofty.com/v1.0/leads/${leadId}`, headers, { lead: undefined as unknown as NormalizeArgs[0] }),
       fetchJson<{ notes: NormalizeArgs[1] }>(`https://api.lofty.com/v1.0/notes?leadId=${leadId}`, headers, { notes: [] }),
-      fetchJson<{ callHistory: NormalizeArgs[2] }>(
-        `https://api.lofty.com/v1.0/communication/call-history?leadId=${leadId}`,
-        headers,
-        { callHistory: [] },
-      ),
+      fetchJson<{ calls: NormalizeArgs[2] }>(`https://api.lofty.com/v1.0/communication/call?leadId=${leadId}`, headers, {
+        calls: [],
+      }),
       fetchJson<{ emails: NormalizeArgs[3] }>(`https://api.lofty.com/v1.0/communication/email?leadId=${leadId}`, headers, {
         emails: [],
       }),
       fetchJson<{ activities: NormalizeArgs[4] }>(`https://api.lofty.com/v2.0/leads/${leadId}/activities`, headers, {
         activities: [],
+      }),
+      fetchJson<{ texts: NormalizeArgs[5] }>(`https://api.lofty.com/v1.0/communication/text?leadId=${leadId}`, headers, {
+        texts: [],
       }),
     ]);
 
@@ -47,9 +48,10 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
     return normalizeLeadProfile(
       leadData.lead,
       notesData.notes,
-      callHistoryData.callHistory,
+      callHistoryData.calls,
       emailHistoryData.emails,
       activitiesData.activities,
+      textHistoryData.texts,
     );
   } catch (error) {
     console.error(`fetchLeadProfile failed for leadId=${leadId}`, error);

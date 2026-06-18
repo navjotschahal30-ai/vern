@@ -42,8 +42,8 @@ async function fetchLeadTags(leadId: string): Promise<string[]> {
 }
 
 async function writeLeadTags(leadId: string, tags: string[]): Promise<void> {
-  const response = await fetch(`${LOFTY_BASE_URL}/leads/${leadId}/tags`, {
-    method: 'POST',
+  const response = await fetch(`${LOFTY_BASE_URL}/leads/${leadId}`, {
+    method: 'PUT',
     headers: getLoftyHeaders(),
     body: JSON.stringify({ tags }),
   });
