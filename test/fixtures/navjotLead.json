@@ -1,0 +1,45 @@
+{
+  "leadId": "1147598340391757",
+  "source": "Website",
+  "firstName": "Prospect",
+  "lastName": null,
+  "phone": "555-0123",
+  "utmData": {
+    "utm_source": "google",
+    "utm_campaign": "norwich-buyers"
+  },
+  "tags": ["Website Lead", "High Intent"],
+  "leadIntent": "buyer",
+  "buyingTimeframe": "1-3",
+  "sellingTimeframe": null,
+  "preApproved": true,
+  "hasHouseToSell": false,
+  "withBuyerAgent": null,
+  "withListingAgent": null,
+  "assignedUser": "Navjot Singh",
+  "currentHomeAddress": null,
+  "propertiesViewed": [
+    { "address": "25 Sunview Drive, Norwich, CT", "price": 299000, "mls": "CT654321" }
+  ],
+  "inquiredProperties": {
+    "priceMin": 250000,
+    "priceMax": 320000,
+    "bedroomsMin": 3,
+    "propertyTypes": ["Single Family"]
+  },
+  "formResponses": [
+    { "question": "What is your timeframe to buy?", "answer": "1-3 months" }
+  ],
+  "touchHistory": [
+    { "type": "note", "timestamp": "2026-06-16T18:00:00.000Z", "isHuman": true },
+    { "type": "property_view", "timestamp": "2026-06-16T12:00:00.000Z", "isHuman": false }
+  ],
+  "engagement": {
+    "lastHumanTouchAt": "2026-06-16T18:00:00.000Z",
+    "lastAnyTouchAt": "2026-06-16T18:00:00.000Z",
+    "touchCountLast60Days": 2,
+    "humanTouchCountLast60Days": 1
+  },
+  "capturedAt": "2026-06-10T14:00:00.000Z",
+  "lastUpdatedAt": "2026-06-16T18:00:00.000Z"
+}
