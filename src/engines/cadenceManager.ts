@@ -1,8 +1,10 @@
 import { qualifyLead, LeadQualification } from './qualificationEngine';
-import { getLeadState } from './stateEngine';
+import { getLeadState, recordOutreach } from './stateEngine';
 import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logComplianceSkip, OutreachHistory } from '../config/compliance';
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
 import { LeadProfile } from '../schemas/leadProfile';
+import { sendSMS } from '../outreach/smsExecutor';
+import { sendEmail } from '../outreach/emailExecutor';
 
 export interface CadenceDecision {
   leadId: string;
@@ -174,4 +176,59 @@ export async function buildCadence(leadIds: string[]): Promise<CadenceResult> {
     scheduled: detailed.scheduled.map(({ leadId, channel, sendAfter, reason }) => ({ leadId, channel, sendAfter, reason })),
     skipped: detailed.skipped.map(({ leadId, reason }) => ({ leadId, reason })),
   };
+}
+
+export interface ExecutedEntry {
+  leadId: string;
+  channel: 'sms' | 'email';
+  sent: boolean;
+  reason: string;
+}
+
+export interface ExecuteCadenceResult {
+  executed: ExecutedEntry[];
+  skipped: SkippedLead[];
+}
+
+/**
+ * Same qualification/compliance pass as buildCadenceDetailed, but actually
+ * sends. Re-fetches each scheduled lead's profile right before sending
+ * (rather than reusing buildCadenceDetailed's copy) so a send can't act on
+ * data that's gone stale between scheduling and execution. recordOutreach
+ * always runs for a scheduled lead, even when smsExecutor/emailExecutor
+ * skip the actual send under TEST_MODE — Vern's own tags must reflect what
+ * the cadence *decided* regardless of whether TEST_MODE suppressed delivery.
+ */
+export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceResult> {
+  const { scheduled, skipped } = await buildCadenceDetailed(leadIds);
+
+  const executed: ExecutedEntry[] = [];
+  const allSkipped: SkippedLead[] = skipped.map(({ leadId, reason }) => ({ leadId, reason }));
+
+  for (const decision of scheduled) {
+    try {
+      const leadProfile = await fetchLeadProfile(decision.leadId);
+      const qualification = qualifyLead(leadProfile);
+
+      const result =
+        decision.channel === 'sms'
+          ? await sendSMS(leadProfile, qualification)
+          : await sendEmail(leadProfile, qualification);
+
+      await recordOutreach(decision.leadId, decision.channel);
+
+      executed.push({
+        leadId: decision.leadId,
+        channel: decision.channel,
+        sent: result.sent,
+        reason: result.sent ? decision.reason : 'Test mode: skipped — not Navjot',
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.error(`[cadence] leadId=${decision.leadId} execution FAILED: ${reason}`);
+      allSkipped.push({ leadId: decision.leadId, reason: `FAILED: ${reason}` });
+    }
+  }
+
+  return { executed, skipped: allSkipped };
 }

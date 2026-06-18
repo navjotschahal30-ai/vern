@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { handleLoftyEvent } from './handlers/eventListener';
 import { handleLoftyWebhook } from './handlers/loftyWebhookHandler';
-import { buildCadence } from './engines/cadenceManager';
+import { executeCadence } from './engines/cadenceManager';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
 
 dotenv.config();
@@ -45,8 +45,8 @@ app.post('/webhook', async (req: Request, res: Response) => {
 app.post('/cadence', async (req: Request, res: Response) => {
   try {
     const { leadIds } = req.body as { leadIds: string[] };
-    const { scheduled, skipped } = await buildCadence(leadIds);
-    res.json({ scheduled, skipped });
+    const { executed, skipped } = await executeCadence(leadIds);
+    res.json({ executed, skipped });
   } catch (error) {
     sendError(res, error);
   }
