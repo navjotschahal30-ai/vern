@@ -13,7 +13,7 @@ function sanitizeApiKey(rawKey: string | undefined): string {
 
 export function getLoftyHeaders(): Record<string, string> {
   return {
-    Authorization: `Bearer ${sanitizeApiKey(process.env.LOFTY_API_KEY)}`,
+    Authorization: `token ${sanitizeApiKey(process.env.LOFTY_API_KEY)}`,
     'Content-Type': 'application/json',
   };
 }
