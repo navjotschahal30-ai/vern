@@ -4,7 +4,11 @@ type NormalizeArgs = Parameters<typeof normalizeLeadProfile>;
 
 async function fetchJson<T>(url: string, headers: Record<string, string>, fallback: T): Promise<T> {
   const response = await fetch(url, { headers });
-  if (!response.ok) return fallback;
+  if (!response.ok) {
+    const body = await response.text().catch(() => '<unreadable body>');
+    console.error(`[lofty] GET ${url} failed: ${response.status} ${response.statusText} — ${body.slice(0, 500)}`);
+    return fallback;
+  }
   return (await response.json()) as T;
 }
 
@@ -37,6 +41,10 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
         activities: [],
       }),
     ]);
+
+    if (!leadData.lead) {
+      throw new Error(`Lofty returned no lead data for leadId=${leadId} — see [lofty] log line above for the HTTP status`);
+    }
 
     return normalizeLeadProfile(
       leadData.lead,
