@@ -2,11 +2,17 @@ import { LeadProfile } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { SMS_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
 import { getLoftyHeaders } from '../config/loftyClient';
+import { isTestMode, navjotPhone } from '../config/testMode';
 
 export interface SendSmsResult {
   sent: true;
   messageId: string;
   timestamp: string;
+}
+
+export interface SkippedSmsResult {
+  sent: false;
+  testMode: true;
 }
 
 function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
@@ -20,7 +26,15 @@ function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
 /**
  * Sends a personalized SMS for a lead via the Lofty messaging API.
  */
-export async function sendSMS(leadProfile: LeadProfile, qualification: LeadQualification): Promise<SendSmsResult> {
+export async function sendSMS(
+  leadProfile: LeadProfile,
+  qualification: LeadQualification,
+): Promise<SendSmsResult | SkippedSmsResult> {
+  if (isTestMode() && leadProfile.phone !== navjotPhone) {
+    console.log(`[test] Skipping SMS to leadId=${leadProfile.leadId} (would send in production)`);
+    return { sent: false, testMode: true };
+  }
+
   const vars = buildTemplateVars(leadProfile);
   const templateKey = selectTemplateKey(leadProfile, qualification);
   const content = SMS_TEMPLATES[templateKey](vars);

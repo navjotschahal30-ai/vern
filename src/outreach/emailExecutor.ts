@@ -2,11 +2,17 @@ import { LeadProfile } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { EMAIL_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
 import { getLoftyHeaders } from '../config/loftyClient';
+import { isTestMode, navjotEmail } from '../config/testMode';
 
 export interface SendEmailResult {
   sent: true;
   messageId: string;
   timestamp: string;
+}
+
+export interface SkippedEmailResult {
+  sent: false;
+  testMode: true;
 }
 
 // Matches the sign-off IDX Stalker already uses for Navjot's outbound email
@@ -27,7 +33,12 @@ function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
 export async function sendEmail(
   leadProfile: LeadProfile,
   qualification: LeadQualification,
-): Promise<SendEmailResult> {
+): Promise<SendEmailResult | SkippedEmailResult> {
+  if (isTestMode() && leadProfile.email !== navjotEmail) {
+    console.log(`[test] Skipping email to leadId=${leadProfile.leadId} (would send in production)`);
+    return { sent: false, testMode: true };
+  }
+
   const vars = buildTemplateVars(leadProfile);
   const templateKey = selectTemplateKey(leadProfile, qualification);
   const { subject, body } = EMAIL_TEMPLATES[templateKey](vars);

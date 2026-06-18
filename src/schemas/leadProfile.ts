@@ -53,6 +53,9 @@ export interface LeadProfile {
   /** Lead's phone number, if Lofty has one on file. */
   phone: string | null;
 
+  /** Lead's email address, if Lofty has one on file. */
+  email?: string | null;
+
   /** UTM params pulled from Lofty customAttributes, if present. */
   utmData: {
     utm_source?: string;
@@ -167,6 +170,7 @@ interface LoftyLead {
   firstName?: string | null;
   lastName?: string | null;
   phone?: string | null;
+  email?: string | null;
   customAttributes?: LoftyCustomAttribute[];
   tags?: LoftyTag[];
   leadTypes?: number[];
@@ -373,6 +377,7 @@ export function normalizeLeadProfile(
     firstName: loftyLead.firstName || null,
     lastName: loftyLead.lastName || null,
     phone: loftyLead.phone || null,
+    email: loftyLead.email || null,
     utmData: extractUtmData(loftyLead.customAttributes),
     tags: (loftyLead.tags ?? []).map((tag) => tag.tagName),
     leadIntent: LEAD_TYPE_TO_INTENT[loftyLead.leadTypes?.[0] as number] ?? 'unknown',
