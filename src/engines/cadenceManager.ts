@@ -198,6 +198,11 @@ export interface ExecuteCadenceResult {
  * always runs for a scheduled lead, even when smsExecutor/emailExecutor
  * skip the actual send under TEST_MODE — Vern's own tags must reflect what
  * the cadence *decided* regardless of whether TEST_MODE suppressed delivery.
+ *
+ * A frequency-capped lead stays in buildCadenceDetailed's `scheduled` list
+ * with a future sendAfter rather than moving to `skipped` (see
+ * DetailedDecision.timingNote) — so this still has to check sendAfter
+ * itself before sending, or every cap would be bypassed on execution.
  */
 export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceResult> {
   const { scheduled, skipped } = await buildCadenceDetailed(leadIds);
@@ -205,7 +210,17 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
   const executed: ExecutedEntry[] = [];
   const allSkipped: SkippedLead[] = skipped.map(({ leadId, reason }) => ({ leadId, reason }));
 
+  const now = new Date();
+
   for (const decision of scheduled) {
+    if (decision.sendAfter.getTime() > now.getTime()) {
+      allSkipped.push({
+        leadId: decision.leadId,
+        reason: `Delayed until ${decision.sendAfter.toISOString()}${decision.timingNote ? ` (${decision.timingNote})` : ''}`,
+      });
+      continue;
+    }
+
     try {
       const leadProfile = await fetchLeadProfile(decision.leadId);
       const qualification = qualifyLead(leadProfile);
