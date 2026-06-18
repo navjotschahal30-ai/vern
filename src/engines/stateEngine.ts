@@ -9,6 +9,8 @@
 // duplicate tags from piling up.
 // ---------------------------------------------------------------------------
 
+import { getLoftyHeaders } from '../config/loftyClient';
+
 const LOFTY_BASE_URL = 'https://api.lofty.com/v1.0';
 
 const VERN_STATE_PREFIX = 'VERN-STATE:';
@@ -30,15 +32,8 @@ interface LoftyLeadTagsResponse {
   };
 }
 
-function loftyHeaders(): Record<string, string> {
-  return {
-    Authorization: `Bearer ${process.env.LOFTY_API_KEY}`,
-    'Content-Type': 'application/json',
-  };
-}
-
 async function fetchLeadTags(leadId: string): Promise<string[]> {
-  const response = await fetch(`${LOFTY_BASE_URL}/leads/${leadId}`, { headers: loftyHeaders() });
+  const response = await fetch(`${LOFTY_BASE_URL}/leads/${leadId}`, { headers: getLoftyHeaders() });
   if (!response.ok) {
     throw new Error(`Lofty lead fetch failed for leadId=${leadId} with status ${response.status}`);
   }
@@ -49,7 +44,7 @@ async function fetchLeadTags(leadId: string): Promise<string[]> {
 async function writeLeadTags(leadId: string, tags: string[]): Promise<void> {
   const response = await fetch(`${LOFTY_BASE_URL}/leads/${leadId}/tags`, {
     method: 'POST',
-    headers: loftyHeaders(),
+    headers: getLoftyHeaders(),
     body: JSON.stringify({ tags }),
   });
   if (!response.ok) {

@@ -1,4 +1,5 @@
 import { normalizeLeadProfile, LeadProfile } from '../schemas/leadProfile';
+import { getLoftyHeaders } from '../config/loftyClient';
 
 type NormalizeArgs = Parameters<typeof normalizeLeadProfile>;
 
@@ -21,10 +22,7 @@ async function fetchJson<T>(url: string, headers: Record<string, string>, fallba
  */
 export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
   try {
-    const headers = {
-      Authorization: `Bearer ${process.env.LOFTY_API_KEY}`,
-      'Content-Type': 'application/json',
-    };
+    const headers = getLoftyHeaders();
 
     const [leadData, notesData, callHistoryData, emailHistoryData, activitiesData] = await Promise.all([
       fetchJson<{ lead: NormalizeArgs[0] }>(`https://api.lofty.com/v1.0/leads/${leadId}`, headers, { lead: undefined as unknown as NormalizeArgs[0] }),

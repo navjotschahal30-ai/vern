@@ -1,6 +1,7 @@
 import { LeadProfile } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { EMAIL_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
+import { getLoftyHeaders } from '../config/loftyClient';
 
 export interface SendEmailResult {
   sent: true;
@@ -35,15 +36,13 @@ export async function sendEmail(
   try {
     const response = await fetch('https://api.lofty.com/v1.0/message/email/send', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.LOFTY_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getLoftyHeaders(),
       body: JSON.stringify({ leadId: leadProfile.leadId, subject, body: fullBody }),
     });
 
     if (!response.ok) {
-      throw new Error(`Lofty email send failed with status ${response.status}`);
+      const body = await response.text().catch(() => '<unreadable body>');
+      throw new Error(`Lofty email send failed with status ${response.status}: ${body.slice(0, 500)}`);
     }
 
     const data = (await response.json()) as { messageId: string };
