@@ -169,8 +169,8 @@ interface LoftyLead {
   source: string;
   firstName?: string | null;
   lastName?: string | null;
-  phone?: string | null;
-  email?: string | null;
+  phones?: string[] | null;
+  emails?: string[] | null;
   customAttributes?: LoftyCustomAttribute[];
   tags?: LoftyTag[];
   leadTypes?: number[];
@@ -376,8 +376,8 @@ export function normalizeLeadProfile(
     source: loftyLead.source,
     firstName: loftyLead.firstName || null,
     lastName: loftyLead.lastName || null,
-    phone: loftyLead.phone || null,
-    email: loftyLead.email || null,
+    phone: loftyLead.phones?.[0] || null,
+    email: loftyLead.emails?.[0] || null,
     utmData: extractUtmData(loftyLead.customAttributes),
     tags: (loftyLead.tags ?? []).map((tag) => tag.tagName),
     leadIntent: LEAD_TYPE_TO_INTENT[loftyLead.leadTypes?.[0] as number] ?? 'unknown',

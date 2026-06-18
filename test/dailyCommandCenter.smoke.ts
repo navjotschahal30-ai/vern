@@ -24,7 +24,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Prospect',
-    phone: '555-0123',
+    phones: ['555-0123'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     preQual: 'Yes',
@@ -43,7 +43,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Bob Li',
-    phone: '555-0199',
+    phones: ['555-0199'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     preQual: 'Yes',
@@ -60,7 +60,7 @@ for (const id of ['W1', 'W2']) {
   addLead(id, {
     source: 'Website',
     firstName: `Warm-${id}`,
-    phone: '555-0200',
+    phones: ['555-0200'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     assignedUser: 'Navjot Singh',
@@ -75,7 +75,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Warm-W3',
-    phone: '555-0201',
+    phones: ['555-0201'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     assignedUser: 'Navjot Singh',
@@ -89,7 +89,7 @@ addLead(
 addLead('G1', {
   source: 'Website',
   firstName: 'Ghost-G1',
-  phone: '555-0300',
+  phones: ['555-0300'],
   leadTypes: [2],
   assignedUser: 'Navjot Singh',
   createTime: daysAgoIso(200),
@@ -97,7 +97,7 @@ addLead('G1', {
 });
 
 // D1: DNC -> skipped
-addLead('D1', { source: 'Website', firstName: 'Dnc-D1', phone: '555-0400', leadTypes: [2], assignedUser: 'Navjot Singh' }, { tags: ['DNC'] });
+addLead('D1', { source: 'Website', firstName: 'Dnc-D1', phones: ['555-0400'], leadTypes: [2], assignedUser: 'Navjot Singh' }, { tags: ['DNC'] });
 
 (globalThis as any).fetch = async (url: string, init?: { method?: string; body?: string }) => {
   const pathMatch = url.match(/leads\/([^/?]+)/);

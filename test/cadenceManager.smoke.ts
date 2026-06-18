@@ -25,7 +25,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Alice',
-    phone: '555-0001',
+    phones: ['555-0001'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     preQual: 'Yes',
@@ -41,7 +41,7 @@ addLead(
 addLead('F', {
   source: 'Website',
   firstName: 'Fred',
-  phone: '555-0006',
+  phones: ['555-0006'],
   leadTypes: [2],
   buyingTimeFrame: '1-3',
   preQual: 'Yes',
@@ -55,7 +55,7 @@ addLead('F', {
 addLead('B', {
   source: 'Website',
   firstName: 'Bob',
-  phone: '555-0002',
+  phones: ['555-0002'],
   leadTypes: [2],
   buyingTimeFrame: '1-3',
   assignedUser: 'Navjot Singh',
@@ -67,7 +67,7 @@ addLead('B', {
 addLead('C', {
   source: 'Website',
   firstName: 'Carol',
-  phone: '555-0003',
+  phones: ['555-0003'],
   leadTypes: [2],
   assignedUser: 'Navjot Singh',
   createTime: daysAgoIso(200),
@@ -80,7 +80,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Dave',
-    phone: '555-0004',
+    phones: ['555-0004'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     preQual: 'Yes',
@@ -97,7 +97,7 @@ addLead(
   {
     source: 'Website',
     firstName: 'Eve',
-    phone: '555-0005',
+    phones: ['555-0005'],
     leadTypes: [2],
     buyingTimeFrame: '1-3',
     preQual: 'Yes',

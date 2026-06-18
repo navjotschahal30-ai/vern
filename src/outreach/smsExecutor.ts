@@ -2,7 +2,7 @@ import { LeadProfile } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { SMS_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
 import { getLoftyHeaders } from '../config/loftyClient';
-import { isTestMode, navjotPhone } from '../config/testMode';
+import { isTestMode, isNavjotPhone } from '../config/testMode';
 
 export interface SendSmsResult {
   sent: true;
@@ -30,7 +30,7 @@ export async function sendSMS(
   leadProfile: LeadProfile,
   qualification: LeadQualification,
 ): Promise<SendSmsResult | SkippedSmsResult> {
-  if (isTestMode() && leadProfile.phone !== navjotPhone) {
+  if (isTestMode() && !isNavjotPhone(leadProfile.phone)) {
     console.log(`[test] Skipping SMS to leadId=${leadProfile.leadId} (would send in production)`);
     return { sent: false, testMode: true };
   }
