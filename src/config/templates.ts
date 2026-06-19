@@ -20,43 +20,43 @@ type EmailTemplate = (vars: TemplateVars) => { subject: string; body: string };
 
 export const SMS_TEMPLATES: Record<TemplateKey, SmsTemplate> = {
   website_buyer_hot: (vars) =>
-    `Hi ${vars.firstName}, I saw you viewed ${vars.property ?? 'that property'} — want me to set up a quick showing?`,
+    `${vars.firstName}, ${vars.property ?? 'that one you viewed'} is priced right for what's moving right now. Want me to set up a walkthrough?`,
   facebook_buyer_warm: (vars) =>
-    `Hi ${vars.firstName}, thanks for your interest in ${vars.city ?? 'the area'} — happy to send over some options if you're still looking.`,
+    `${vars.firstName}, ${vars.city ?? 'your search area'} has had some quiet movement lately worth a look. Want me to send what's new?`,
   ghost_reactivation: (vars) =>
-    `Hi ${vars.firstName}, haven't heard from you in a while — still in the market, or has your plan changed?`,
+    `${vars.firstName}, a few solid options just hit the market in ${vars.city ?? 'your area'}. Want me to send them over?`,
   generic_hot: (vars) =>
-    `Hi ${vars.firstName}, following up on your home search — want me to put together some options for you?`,
+    `${vars.firstName}, inventory's moving fast right now and a few places fit exactly what you're after. Want first look?`,
   generic_warm: (vars) =>
-    `Hi ${vars.firstName}, just checking in on your home search — let me know if you'd like some options.`,
+    `${vars.firstName}, things have shifted a bit in the market lately, worth a quick look at what's new. Want me to send a few?`,
   generic_cold: (vars) =>
-    `Hi ${vars.firstName}, here are a few listings that might interest you — let me know if anything stands out.`,
+    `${vars.firstName}, a couple of fresh listings line up with what you'd looked at before. Want a peek?`,
 };
 
 export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   website_buyer_hot: (vars) => ({
-    subject: `${vars.property ?? 'That property'} you viewed`,
-    body: `Hi ${vars.firstName},\n\nI saw you viewed ${vars.property ?? 'a property'} recently. Want me to set up a quick showing?`,
+    subject: `${vars.property ?? 'That listing'} you viewed`,
+    body: `${vars.firstName}, ${vars.property ?? 'that place you viewed'} is priced right for what's moving right now. Homes like it aren't sitting long. Want me to set up a walkthrough?`,
   }),
   facebook_buyer_warm: (vars) => ({
-    subject: `${vars.city ?? 'Your area'} home search`,
-    body: `Hi ${vars.firstName},\n\nThanks for your interest in ${vars.city ?? 'the area'}. Happy to send over some options if you're still looking.`,
+    subject: `${vars.city ?? 'Your search area'} update`,
+    body: `${vars.firstName}, ${vars.city ?? 'your search area'} has had some quiet movement lately worth a look. Want me to send what's new?`,
   }),
   ghost_reactivation: (vars) => ({
-    subject: 'Still looking?',
-    body: `Hi ${vars.firstName},\n\nHaven't heard from you in a while — still in the market, or has your plan changed?`,
+    subject: `New in ${vars.city ?? 'your area'}`,
+    body: `${vars.firstName}, a few solid options just hit the market in ${vars.city ?? 'your area'}. Want me to send them over?`,
   }),
   generic_hot: (vars) => ({
-    subject: 'Your home search',
-    body: `Hi ${vars.firstName},\n\nFollowing up on your home search — want me to put together some options for you?`,
+    subject: 'Worth a look right now',
+    body: `${vars.firstName}, inventory's moving fast right now and a few places fit exactly what you're after. Want first look?`,
   }),
   generic_warm: (vars) => ({
-    subject: 'Checking in',
-    body: `Hi ${vars.firstName},\n\nJust checking in on your home search — let me know if you'd like some options.`,
+    subject: 'A quick market update',
+    body: `${vars.firstName}, things have shifted a bit in the market lately, worth a quick look at what's new. Want me to send a few?`,
   }),
   generic_cold: (vars) => ({
-    subject: 'A few listings for you',
-    body: `Hi ${vars.firstName},\n\nHere are a few listings that might interest you — let me know if anything stands out.`,
+    subject: 'A few fresh listings',
+    body: `${vars.firstName}, a couple of fresh listings line up with what you'd looked at before. Want a peek?`,
   }),
 };
 

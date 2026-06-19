@@ -280,6 +280,8 @@ export function qualifyLead(leadProfile: LeadProfile): LeadQualification {
 
   const hoursSinceLastTouch = (daysSinceLastActivity(leadProfile) ?? Infinity) * 24;
 
+  const greetingName = leadProfile.firstName ?? 'there';
+
   const ghost = qualifiesForGhost(leadProfile);
   if (ghost.qualified) {
     return {
@@ -288,7 +290,7 @@ export function qualifyLead(leadProfile: LeadProfile): LeadQualification {
       reason: ghost.reason,
       nextAction: 'email',
       nextContactWindow: contactWindowFor('ghost', hoursSinceLastTouch),
-      personalizedMessage: 'Win-back check-in: are you still looking for a home?',
+      personalizedMessage: `${greetingName}, a few new listings just came up that fit what you were after before. Want me to send them over?`,
       score,
     };
   }
@@ -305,8 +307,8 @@ export function qualifyLead(leadProfile: LeadProfile): LeadQualification {
       nextAction: 'sms',
       nextContactWindow: contactWindowFor('hot', hoursSinceLastTouch),
       personalizedMessage: property
-        ? `Hi! Saw you checked out ${property.address} — want me to set up a showing?`
-        : 'Hi! Following up on your home search — want me to put together some options?',
+        ? `${greetingName}, ${property.address} is priced right for what's moving right now. Want me to set up a walkthrough?`
+        : `${greetingName}, inventory's moving fast right now and a few places fit exactly what you're after. Want first look?`,
       score,
     };
   }
