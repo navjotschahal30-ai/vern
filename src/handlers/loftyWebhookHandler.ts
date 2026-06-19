@@ -69,3 +69,14 @@ export async function handleLoftyWebhook(payload: any): Promise<LeadProfile> {
   const leadId = payload.updatedLead[0].leadId;
   return fetchLeadProfile(leadId);
 }
+
+/**
+ * Lists leadIds assigned to a given user, for batch cadence runs that need
+ * "all of Navjot's leads" rather than an explicit leadIds list.
+ */
+export async function fetchAssignedLeadIds(assignedUserId: string, limit = 500): Promise<string[]> {
+  const headers = getLoftyHeaders();
+  const url = `https://api.lofty.com/v1.0/leads?assignedUserId=${assignedUserId}&limit=${limit}`;
+  const { leads } = await fetchJson<{ leads: Array<{ leadId: number | string }> }>(url, headers, { leads: [] });
+  return leads.map((lead) => String(lead.leadId));
+}

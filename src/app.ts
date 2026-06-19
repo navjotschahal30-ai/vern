@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { handleLoftyEvent } from './handlers/eventListener';
-import { handleLoftyWebhook } from './handlers/loftyWebhookHandler';
+import { handleLoftyWebhook, fetchAssignedLeadIds } from './handlers/loftyWebhookHandler';
 import { executeCadence } from './engines/cadenceManager';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
 
@@ -45,6 +45,18 @@ app.post('/webhook', async (req: Request, res: Response) => {
 app.post('/cadence', async (req: Request, res: Response) => {
   try {
     const { leadIds } = req.body as { leadIds: string[] };
+    const { executed, skipped } = await executeCadence(leadIds);
+    res.json({ executed, skipped });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+const NAVJOT_LOFTY_USER_ID = '844770719757219';
+
+app.get('/cadence/daily', async (_req: Request, res: Response) => {
+  try {
+    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID, 500);
     const { executed, skipped } = await executeCadence(leadIds);
     res.json({ executed, skipped });
   } catch (error) {
