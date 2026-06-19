@@ -54,7 +54,7 @@ app.post('/cadence', async (req: Request, res: Response) => {
 
 const NAVJOT_LOFTY_USER_ID = '844770719757219';
 
-app.get('/cadence/daily', async (_req: Request, res: Response) => {
+app.post('/cadence/daily', async (_req: Request, res: Response) => {
   try {
     const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID, 500);
     const { executed, skipped } = await executeCadence(leadIds);
