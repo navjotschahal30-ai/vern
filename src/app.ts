@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { handleLoftyEvent } from './handlers/eventListener';
@@ -207,15 +208,58 @@ app.post('/cadence/tag-only', async (_req: Request, res: Response) => {
   }
 });
 
-app.post('/cadence/daily', async (_req: Request, res: Response) => {
+interface DailyCadenceJob {
+  status: 'running' | 'completed' | 'failed';
+  executed: number;
+  skipped: number;
+  error?: string;
+}
+
+// In-memory only — fine for a single-instance service; a job's status is
+// lost on restart/redeploy, which just means a client polling an in-flight
+// job sees a 404 rather than stale state.
+const dailyCadenceJobs = new Map<string, DailyCadenceJob>();
+
+/**
+ * The actual /cadence/daily work, run detached from the request so a slow
+ * Lofty pass (681 leads, rate-limit backoff included) can't trip Railway's
+ * gateway timeout. Failures are caught here and recorded on the job rather
+ * than thrown — there's no request left to propagate them to.
+ */
+async function runDailyCadenceJob(jobId: string): Promise<void> {
   try {
     const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
     const { selected, skipped: rosterSkipped } = await buildDailyRoster(leadIds);
     const { executed, skipped: executionSkipped } = await executeCadence(selected);
-    res.json({ executed, skipped: [...rosterSkipped, ...executionSkipped] });
+
+    dailyCadenceJobs.set(jobId, {
+      status: 'completed',
+      executed: executed.length,
+      skipped: rosterSkipped.length + executionSkipped.length,
+    });
   } catch (error) {
-    sendError(res, error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[cadence/daily] job ${jobId} failed`, error);
+    dailyCadenceJobs.set(jobId, { status: 'failed', executed: 0, skipped: 0, error: message });
   }
+}
+
+app.post('/cadence/daily', (_req: Request, res: Response) => {
+  const jobId = randomUUID();
+  dailyCadenceJobs.set(jobId, { status: 'running', executed: 0, skipped: 0 });
+
+  void runDailyCadenceJob(jobId);
+
+  res.status(202).json({ jobId, status: 'queued' });
+});
+
+app.get('/cadence/daily/:jobId', (req: Request<{ jobId: string }>, res: Response) => {
+  const job = dailyCadenceJobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: 'Unknown jobId', code: 404 });
+    return;
+  }
+  res.json(job);
 });
 
 app.get('/daily-report', async (req: Request, res: Response) => {
