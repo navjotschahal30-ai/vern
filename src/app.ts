@@ -118,15 +118,21 @@ async function qualifyBatchWithBackoff(batch: string[]): Promise<QualifyBatchRes
   return settled;
 }
 
+interface RosterSelection {
+  leadId: string;
+  status: 'hot' | 'warm' | 'ghost';
+}
+
 /**
  * Qualifies every assigned lead — in batches of DAILY_ROSTER_BATCH_SIZE,
  * each fetched/qualified in parallel via Promise.all — then selects today's
  * roster once all batches are in: the top-scoring leads within each of the
  * hot/warm/ghost tiers (capped per DAILY_ROSTER_CAPS). Blocked/DNC leads and
  * leads that don't make a tier's cutoff are returned as skipped rather than
- * passed to executeCadence.
+ * passed to executeCadence. Shared by /cadence/daily and
+ * /cadence/tag-only-sample so both run the identical selection path.
  */
-async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]; skipped: SkippedLead[] }> {
+async function selectDailyRoster(leadIds: string[]): Promise<{ selected: RosterSelection[]; skipped: SkippedLead[] }> {
   const skipped: SkippedLead[] = [];
   const qualified: Array<{ leadId: string; qualification: LeadQualification }> = [];
 
@@ -152,12 +158,12 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
     byTier[qualification.status].push({ leadId, score: qualification.score });
   }
 
-  const selected: string[] = [];
+  const selected: RosterSelection[] = [];
   for (const tier of Object.keys(DAILY_ROSTER_CAPS) as Array<keyof typeof DAILY_ROSTER_CAPS>) {
     const cap = DAILY_ROSTER_CAPS[tier];
     const sorted = byTier[tier].sort((a, b) => b.score - a.score);
 
-    selected.push(...sorted.slice(0, cap).map((candidate) => candidate.leadId));
+    selected.push(...sorted.slice(0, cap).map((candidate) => ({ leadId: candidate.leadId, status: tier })));
     sorted.slice(cap).forEach((candidate, i) => {
       skipped.push({
         leadId: candidate.leadId,
@@ -167,6 +173,11 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
   }
 
   return { selected, skipped };
+}
+
+async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]; skipped: SkippedLead[] }> {
+  const { selected, skipped } = await selectDailyRoster(leadIds);
+  return { selected: selected.map((candidate) => candidate.leadId), skipped };
 }
 
 /**
@@ -206,6 +217,60 @@ app.post('/cadence/tag-only', async (_req: Request, res: Response) => {
   } catch (error) {
     sendError(res, error);
   }
+});
+
+interface TagOnlySampleJob {
+  status: 'running' | 'completed' | 'failed';
+  tagged: number;
+  skipped: number;
+  error?: string;
+}
+
+// Separate map from dailyCadenceJobs (see below) — same in-memory,
+// lost-on-restart tradeoff, kept independent since the two job kinds
+// track different fields (tagged vs executed).
+const tagOnlySampleJobs = new Map<string, TagOnlySampleJob>();
+
+/**
+ * Runs the exact same selection path /cadence/daily uses (selectDailyRoster:
+ * qualify all 681, pick top 10 hot / 20 warm / 20 ghost), then tags just
+ * those ~50 leads with VERN-STATE and skips SMS/email — a low-quota dry run
+ * of tomorrow's real cadence path.
+ */
+async function runTagOnlySampleJob(jobId: string): Promise<void> {
+  try {
+    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
+    const { selected, skipped } = await selectDailyRoster(leadIds);
+
+    for (let i = 0; i < selected.length; i += DAILY_ROSTER_BATCH_SIZE) {
+      const batch = selected.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+      await Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status)));
+    }
+
+    tagOnlySampleJobs.set(jobId, { status: 'completed', tagged: selected.length, skipped: skipped.length });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[cadence/tag-only-sample] job ${jobId} failed`, error);
+    tagOnlySampleJobs.set(jobId, { status: 'failed', tagged: 0, skipped: 0, error: message });
+  }
+}
+
+app.post('/cadence/tag-only-sample', (_req: Request, res: Response) => {
+  const jobId = randomUUID();
+  tagOnlySampleJobs.set(jobId, { status: 'running', tagged: 0, skipped: 0 });
+
+  void runTagOnlySampleJob(jobId);
+
+  res.status(202).json({ jobId, status: 'queued' });
+});
+
+app.get('/cadence/tag-only-sample/:jobId', (req: Request<{ jobId: string }>, res: Response) => {
+  const job = tagOnlySampleJobs.get(req.params.jobId);
+  if (!job) {
+    res.status(404).json({ error: 'Unknown jobId', code: 404 });
+    return;
+  }
+  res.json(job);
 });
 
 interface DailyCadenceJob {
