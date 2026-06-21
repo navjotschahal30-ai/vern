@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { handleLoftyEvent } from './handlers/eventListener';
-import { handleLoftyWebhook, fetchAssignedLeadIds, fetchLeadProfile } from './handlers/loftyWebhookHandler';
+import { handleLoftyWebhook, fetchAssignedLeadIds, fetchLeadProfile, LoftyRateLimitError } from './handlers/loftyWebhookHandler';
 import { executeCadence, SkippedLead } from './engines/cadenceManager';
 import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
@@ -64,7 +64,17 @@ const DAILY_ROSTER_CAPS: Record<'hot' | 'warm' | 'ghost', number> = { hot: 10, w
 // once would fire ~4000 concurrent Lofty requests. Batches of this size run
 // their fetches in parallel (Promise.all) but batches themselves run one
 // after another.
-const DAILY_ROSTER_BATCH_SIZE = Number(process.env.DAILY_ROSTER_BATCH_SIZE) || 20;
+const DAILY_ROSTER_BATCH_SIZE = Number(process.env.DAILY_ROSTER_BATCH_SIZE) || 10;
+
+// Lofty 429s show up batch-wide rather than on isolated leads, so a hit gets
+// retried (only the rate-limited leads, not the whole batch) with doubling
+// backoff before being recorded as a permanent skip.
+const BATCH_RETRY_BASE_DELAY_MS = 2000;
+const MAX_BATCH_RETRIES = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 interface RosterCandidate {
   leadId: string;
@@ -72,17 +82,38 @@ interface RosterCandidate {
 }
 
 type QualifyBatchResult =
-  | { leadId: string; qualification: LeadQualification; error?: undefined }
-  | { leadId: string; qualification?: undefined; error: string };
+  | { leadId: string; qualification: LeadQualification; error?: undefined; rateLimited?: undefined }
+  | { leadId: string; qualification?: undefined; error: string; rateLimited: boolean };
 
 async function qualifyLeadSafe(leadId: string): Promise<QualifyBatchResult> {
   try {
     const leadProfile = await fetchLeadProfile(leadId);
     return { leadId, qualification: qualifyLead(leadProfile) };
   } catch (error) {
+    const rateLimited = error instanceof LoftyRateLimitError;
     const reason = error instanceof Error ? error.message : String(error);
-    return { leadId, error: `FAILED: ${reason}` };
+    return { leadId, error: `FAILED: ${reason}`, rateLimited };
   }
+}
+
+async function qualifyBatchWithBackoff(batch: string[]): Promise<QualifyBatchResult[]> {
+  let pending = batch;
+  let settled: QualifyBatchResult[] = [];
+
+  for (let attempt = 0; attempt <= MAX_BATCH_RETRIES; attempt++) {
+    const results = await Promise.all(pending.map(qualifyLeadSafe));
+    const rateLimited = results.filter((result) => result.rateLimited);
+    settled = settled.concat(results.filter((result) => !result.rateLimited));
+
+    if (rateLimited.length === 0 || attempt === MAX_BATCH_RETRIES) {
+      return settled.concat(rateLimited);
+    }
+
+    await sleep(BATCH_RETRY_BASE_DELAY_MS * 2 ** attempt);
+    pending = rateLimited.map((result) => result.leadId);
+  }
+
+  return settled;
 }
 
 /**
@@ -99,7 +130,7 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
 
   for (let i = 0; i < leadIds.length; i += DAILY_ROSTER_BATCH_SIZE) {
     const batch = leadIds.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
-    const results = await Promise.all(batch.map(qualifyLeadSafe));
+    const results = await qualifyBatchWithBackoff(batch);
 
     for (const result of results) {
       if (result.error !== undefined) {

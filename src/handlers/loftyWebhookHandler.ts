@@ -3,8 +3,18 @@ import { getLoftyHeaders } from '../config/loftyClient';
 
 type NormalizeArgs = Parameters<typeof normalizeLeadProfile>;
 
+export class LoftyRateLimitError extends Error {
+  constructor(url: string) {
+    super(`Lofty rate limit (429) on ${url}`);
+    this.name = 'LoftyRateLimitError';
+  }
+}
+
 async function fetchJson<T>(url: string, headers: Record<string, string>, fallback: T): Promise<T> {
   const response = await fetch(url, { headers });
+  if (response.status === 429) {
+    throw new LoftyRateLimitError(url);
+  }
   if (!response.ok) {
     const body = await response.text().catch(() => '<unreadable body>');
     console.error(`[lofty] GET ${url} failed: ${response.status} ${response.statusText} — ${body.slice(0, 500)}`);
