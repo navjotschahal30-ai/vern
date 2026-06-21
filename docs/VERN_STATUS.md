@@ -64,8 +64,8 @@
   - `LOFTY_TEAM_ID` = `844770719757219`
   - `TEST_MODE` = `false`
   - `NODE_ENV` = `production`
-  - `VERN_PORT` = `3000`
-  - (plus Railway-managed vars: `RAILWAY_PUBLIC_DOMAIN`, `RAILWAY_PROJECT_NAME`, etc.)
+  - (plus Railway-managed vars: `RAILWAY_PUBLIC_DOMAIN`, `RAILWAY_PROJECT_NAME`, `PORT`, etc.)
+- **Port handling:** app listens on `process.env.PORT || 3000` (standard Railway convention, replacing the old `VERN_PORT`). Railway auto-injects `PORT` at runtime; the service domain's target port must match it (currently `8080` — fixed 2026-06-21 after a target-port mismatch with the stale `3000` value caused a 502 on `/health`).
 
 **Known operational note:** Railway also shows a native Cron Schedule attached to the `vern` service (`0 13 * * *`, "next run" tracked separately from deploys). Because the service's deploy command (`npm run start`) just boots the Express listener rather than exiting, that Railway-native schedule does not by itself guarantee `/cadence/daily` gets called — the GitHub Actions workflow above is the verified trigger mechanism for the daily run. The Railway dashboard's Cron Schedule command field should be checked/cleared to avoid relying on it as a second, unverified trigger path.
 

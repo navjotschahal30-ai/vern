@@ -26,7 +26,7 @@ Vern is a lead lifecycle automation agent for real estate teams. It connects to 
    Then edit `.env` and fill in:
    - `LOFTY_API_KEY` = your Lofty API key (from Lofty Settings > Integrations > API)
    - `LOFTY_TEAM_ID` = 400919269340348
-   - `VERN_PORT` = 3000 (or your preferred port)
+   - `PORT` = 3000 (or your preferred port)
    - `NODE_ENV` = development
 
 3. **Build and test:**
@@ -46,8 +46,9 @@ Vern is a lead lifecycle automation agent for real estate teams. It connects to 
 2. Add environment variables in Railway settings:
    - `LOFTY_API_KEY` (from GitHub Secrets or set directly)
    - `LOFTY_TEAM_ID`
-   - `VERN_PORT`
    - `NODE_ENV` = production
+
+   Railway auto-injects `PORT` — no need to set it manually.
 3. Railway will auto-deploy on push to `main`
 
 ## GitHub Secrets (for CI/CD)
