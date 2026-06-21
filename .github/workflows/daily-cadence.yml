@@ -2,7 +2,7 @@ name: Daily Cadence
 
 on:
   schedule:
-    - cron: '0 13 * * *' # 9am ET
+    - cron: '0 13 * * 1-5' # 9am ET, Mon-Fri
 
 jobs:
   trigger-cadence:
