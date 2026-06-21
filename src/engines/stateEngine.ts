@@ -111,7 +111,7 @@ export async function recordOutreach(leadId: string, type: 'sms' | 'email'): Pro
 }
 
 /** Updates VERN-STATE in Lofty, replacing any prior state tag rather than accumulating. */
-export async function updateLeadState(leadId: string, state: 'hot' | 'warm' | 'ghost'): Promise<void> {
+export async function updateLeadState(leadId: string, state: 'hot' | 'warm' | 'ghost' | 'blocked'): Promise<void> {
   try {
     const tags = await fetchLeadTags(leadId);
     const updatedTags = replaceTagsWithPrefix(tags, VERN_STATE_PREFIX, `${VERN_STATE_PREFIX}${state}`);

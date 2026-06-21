@@ -5,6 +5,7 @@ import { handleLoftyWebhook, fetchAssignedLeadIds, fetchLeadProfile, LoftyRateLi
 import { executeCadence, SkippedLead } from './engines/cadenceManager';
 import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
+import { updateLeadState } from './engines/stateEngine';
 
 dotenv.config();
 
@@ -166,6 +167,45 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
 
   return { selected, skipped };
 }
+
+/**
+ * Qualifies every assigned lead and writes the resulting VERN-STATE tag
+ * (hot/warm/ghost/blocked) without sending any SMS/email — a dry run for
+ * sanity-checking qualification + rate-limit handling against the full
+ * lead book before a real /cadence/daily run.
+ */
+async function tagLeadsOnly(leadIds: string[]): Promise<Record<LeadQualification['status'], number>> {
+  const breakdown: Record<LeadQualification['status'], number> = { hot: 0, warm: 0, ghost: 0, blocked: 0 };
+  const tagged: Array<{ leadId: string; status: LeadQualification['status'] }> = [];
+
+  for (let i = 0; i < leadIds.length; i += DAILY_ROSTER_BATCH_SIZE) {
+    const batch = leadIds.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+    const results = await qualifyBatchWithBackoff(batch);
+
+    for (const result of results) {
+      if (result.error !== undefined) continue;
+      tagged.push({ leadId: result.leadId, status: result.qualification.status });
+    }
+  }
+
+  for (let i = 0; i < tagged.length; i += DAILY_ROSTER_BATCH_SIZE) {
+    const batch = tagged.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+    await Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status)));
+    batch.forEach(({ status }) => breakdown[status]++);
+  }
+
+  return breakdown;
+}
+
+app.post('/cadence/tag-only', async (_req: Request, res: Response) => {
+  try {
+    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
+    const breakdown = await tagLeadsOnly(leadIds);
+    res.json(breakdown);
+  } catch (error) {
+    sendError(res, error);
+  }
+});
 
 app.post('/cadence/daily', async (_req: Request, res: Response) => {
   try {
