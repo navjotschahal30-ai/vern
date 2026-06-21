@@ -78,16 +78,15 @@ const LOFTY_LEADS_PAGE_SIZE = 100;
  * Lists leadIds assigned to a given user, for batch cadence runs that need
  * "all of Navjot's leads" rather than an explicit leadIds list.
  */
-export async function fetchAssignedLeadIds(assignedUserId: string, limit = 500): Promise<string[]> {
+export async function fetchAssignedLeadIds(assignedUserId: string): Promise<string[]> {
   const headers = getLoftyHeaders();
-  const pageSize = Math.min(limit, LOFTY_LEADS_PAGE_SIZE);
 
   const leadIds: string[] = [];
   let offset = 0;
   let total = Infinity;
 
   while (offset < total) {
-    const url = `https://api.lofty.com/v1.0/leads?assignedUserId=${assignedUserId}&limit=${pageSize}&offset=${offset}`;
+    const url = `https://api.lofty.com/v1.0/leads?assignedUserId=${assignedUserId}&limit=${LOFTY_LEADS_PAGE_SIZE}&offset=${offset}`;
     const { leads, _metadata } = await fetchJson<{
       leads: Array<{ leadId: number | string }>;
       _metadata?: { total?: number };
