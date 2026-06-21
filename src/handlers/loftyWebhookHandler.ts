@@ -70,13 +70,35 @@ export async function handleLoftyWebhook(payload: any): Promise<LeadProfile> {
   return fetchLeadProfile(leadId);
 }
 
+// Lofty rejects limit values above 100 (errorCode=20042 "Limit must be between 1 and 100"),
+// so we page through offsets and stop once _metadata.total has been covered.
+const LOFTY_LEADS_PAGE_SIZE = 100;
+
 /**
  * Lists leadIds assigned to a given user, for batch cadence runs that need
  * "all of Navjot's leads" rather than an explicit leadIds list.
  */
 export async function fetchAssignedLeadIds(assignedUserId: string, limit = 500): Promise<string[]> {
   const headers = getLoftyHeaders();
-  const url = `https://api.lofty.com/v1.0/leads?assignedUserId=${assignedUserId}&limit=${limit}`;
-  const { leads } = await fetchJson<{ leads: Array<{ leadId: number | string }> }>(url, headers, { leads: [] });
-  return leads.map((lead) => String(lead.leadId));
+  const pageSize = Math.min(limit, LOFTY_LEADS_PAGE_SIZE);
+
+  const leadIds: string[] = [];
+  let offset = 0;
+  let total = Infinity;
+
+  while (offset < total) {
+    const url = `https://api.lofty.com/v1.0/leads?assignedUserId=${assignedUserId}&limit=${pageSize}&offset=${offset}`;
+    const { leads, _metadata } = await fetchJson<{
+      leads: Array<{ leadId: number | string }>;
+      _metadata?: { total?: number };
+    }>(url, headers, { leads: [] });
+
+    if (leads.length === 0) break;
+
+    leadIds.push(...leads.map((lead) => String(lead.leadId)));
+    offset += leads.length;
+    total = _metadata?.total ?? leadIds.length;
+  }
+
+  return leadIds;
 }
