@@ -158,5 +158,5 @@ app.get('/daily-report', async (req: Request, res: Response) => {
   }
 });
 
-const port = process.env.VERN_PORT || 3000;
+const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Vern listening on port ${port}`));
