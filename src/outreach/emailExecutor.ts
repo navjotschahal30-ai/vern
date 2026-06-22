@@ -48,7 +48,7 @@ export async function sendEmail(
     const response = await fetch('https://api.lofty.com/v1.0/message/email/send', {
       method: 'POST',
       headers: getLoftyHeaders(),
-      body: JSON.stringify({ leadId: leadProfile.leadId, subject, body: fullBody }),
+      body: JSON.stringify({ leadId: leadProfile.leadId, subject, content: fullBody }),
     });
 
     if (!response.ok) {
