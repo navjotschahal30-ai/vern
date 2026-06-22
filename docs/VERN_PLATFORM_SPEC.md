@@ -86,6 +86,60 @@ This document is the canonical architecture reference. It should be detailed eno
 | Secrets | per-tenant encrypted vault (KMS-backed) |
 | Infra | Containers on ECS/Fly/Render; Terraform for IaC |
 
+### 1.5 Content Agent (Market Intelligence)
+
+A dedicated agent, separate from the per-lead conversational Vern persona, that owns all market-data ingestion and derived content (CMAs, market reports, trend signals). It runs on its own schedule rather than in the per-message request path, and its outputs feed both Vern (qualification scoring) and Aria (intake conversation) rather than talking to leads directly.
+
+#### Responsibilities
+
+1. Daily MLS data sync (by neighborhood)
+2. Market analysis (price trends, DOM, inventory)
+3. CMA generation (on-demand)
+4. Report generation (weekly market summary)
+
+#### Data sources
+
+- MLS/DDF sync (existing infrastructure)
+- Historical sales data (cached in DB)
+- Current listings (real-time)
+
+#### Outputs
+
+- Market reports by neighborhood (JSON)
+- CMAs (PDF, email-ready)
+- Trend signals for Vern qualification
+- Conversation data for Aria
+
+#### Integration
+
+- **Vern**: uses market data to boost hot lead scores
+- **Aria**: mentions market trends during intake
+- **Agent**: requests CMAs for leads, shares in calls
+
+#### CMA request flow
+
+```
+POST /agents/{agentId}/cma
+{
+  leadId,
+  propertyAddress,
+  format: "pdf" | "json"
+}
+→ Content Agent generates → Stored in Lofty notes + emailed to agent
+```
+
+#### Market report flow
+
+Nightly, Content Agent:
+
+1. Fetches MLS sales last 24h
+2. Analyzes by neighborhood
+3. Generates: `{neighborhood, avgPrice, priceChange%, DOM, inventory}`
+4. Stores in DB
+5. Vern reads on qualification run
+
+This keeps all agents using fresh, localized market data.
+
 ---
 
 ## 2. Data Models
