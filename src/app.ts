@@ -104,7 +104,12 @@ async function qualifyBatchWithBackoff(batch: string[]): Promise<QualifyBatchRes
   let settled: QualifyBatchResult[] = [];
 
   for (let attempt = 0; attempt <= MAX_BATCH_RETRIES; attempt++) {
-    const results = await Promise.all(pending.map(qualifyLeadSafe));
+    // Sequential, not Promise.all — firing every lead in the batch at once
+    // is exactly the burst that trips Lofty's per-second rate limit.
+    const results: QualifyBatchResult[] = [];
+    for (const leadId of pending) {
+      results.push(await qualifyLeadSafe(leadId));
+    }
     const rateLimited = results.filter((result) => result.rateLimited);
     settled = settled.concat(results.filter((result) => !result.rateLimited));
 
