@@ -140,6 +140,53 @@ Nightly, Content Agent:
 
 This keeps all agents using fresh, localized market data.
 
+### 1.6 Aria Agent (Intake)
+
+Aria is the intake agent for leads that don't arrive pre-normalized from a website form — phone-in calls, referrals, open-house sign-ins. It runs a live voice/conversation flow to capture the same structured fields a web form would have provided, then hands the normalized lead off to Vern's qualification FSM (Section 5). Aria does not itself qualify or run outreach cadences — it produces a `LeadProfile` and stops.
+
+#### Responsibilities
+
+1. Conduct live intake conversation (voice call or chat) for leads with no existing CRM record
+2. Capture core intake fields: contact info, motivation, timeline, financing, budget, location/property fit (same schema Vern's qualification algorithm consumes, Section 5.1)
+3. Reference current market context during intake (via Content Agent trend signals) so the conversation reads as locally informed rather than scripted
+4. Push the normalized lead into the CRM (via the same `CrmAdapter` interface, Section 3) and hand off to Vern for qualification + cadence
+
+#### Inputs
+
+- Live voice call audio (transcribed) or inbound chat/SMS
+- Open-house sign-in sheet data (manual or scanned entry)
+- Referral notes from the referring agent
+- Market trend signals from the Content Agent (Section 1.5), surfaced conversationally rather than recited
+
+#### Outputs
+
+- A populated `LeadProfile` (same shape consumed by `qualificationEngine`), pushed to the CRM as a new lead
+- Intake call transcript / conversation log, stored as a CRM activity note
+- Handoff event to Vern: lead enters the qualification FSM at `engaged` rather than `new`, since intake already captured most qualification fields
+
+#### Integration
+
+- **Content Agent**: supplies neighborhood trend data Aria references during intake (e.g. "homes in that area have been moving in about 18 days")
+- **Vern**: receives Aria's completed `LeadProfile` and skips re-asking any field Aria already captured
+- **CRM adapters**: Aria creates the lead record via `pushLead()` exactly as a webhook-sourced lead would, so downstream CRM sync logic doesn't need to special-case intake-agent-originated leads
+- **Agent**: notified when Aria completes an intake so they're aware of the new lead before Vern's first outreach goes out
+
+#### Intake flow
+
+```
+Inbound call/chat with no matching CRM record
+  → Aria starts intake conversation
+  → Captures: name, phone, motivation, timeline, financing, budget, location
+  → Optionally references Content Agent market signals for the stated area
+  → POST /agents/{agentId}/leads  (crm_source: "manual", source_channel: "voice")
+  → CRM adapter pushLead() creates the record
+  → Lead handed to Vern, stage = "engaged"
+```
+
+#### Status
+
+Not yet built. Voice/call-transcript ingestion and the intake conversation flow are both open work — see `docs/VERN_STATUS.md` Section 5 ("What's NOT Built"). Until Aria exists, leads without a web-form origin are entered manually and start in Vern's qualification FSM at `new`.
+
 ---
 
 ## 2. Data Models
