@@ -75,7 +75,10 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
     );
     await sleep(80);
     const activitiesData = await fetchJson<{ activities: NormalizeArgs[4] }>(
-      `https://api.lofty.com/v2.0/leads/${leadId}/activities`,
+      // Default limit is 10, sorted ascending — that's the OLDEST 10
+      // activities, not the most recent. 1000 is the documented max and
+      // comfortably covers any real lead's full history.
+      `https://api.lofty.com/v2.0/leads/${leadId}/activities?limit=1000`,
       headers,
       { activities: [] },
     );
