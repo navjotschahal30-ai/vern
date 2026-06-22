@@ -10,9 +10,14 @@ export class LoftyRateLimitError extends Error {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchJson<T>(url: string, headers: Record<string, string>, fallback: T): Promise<T> {
   const response = await fetch(url, { headers });
   if (response.status === 429) {
+    console.warn(`[lofty] 429 rate limited: GET ${url}`);
     throw new LoftyRateLimitError(url);
   }
   if (!response.ok) {
@@ -34,22 +39,39 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
   try {
     const headers = getLoftyHeaders();
 
-    const [leadData, notesData, callHistoryData, emailHistoryData, activitiesData, textHistoryData] = await Promise.all([
-      fetchJson<{ lead: NormalizeArgs[0] }>(`https://api.lofty.com/v1.0/leads/${leadId}`, headers, { lead: undefined as unknown as NormalizeArgs[0] }),
-      fetchJson<{ notes: NormalizeArgs[1] }>(`https://api.lofty.com/v1.0/notes?leadId=${leadId}`, headers, { notes: [] }),
-      fetchJson<{ calls: NormalizeArgs[2] }>(`https://api.lofty.com/v1.0/communication/call?leadId=${leadId}`, headers, {
-        calls: [],
-      }),
-      fetchJson<{ emails: NormalizeArgs[3] }>(`https://api.lofty.com/v1.0/communication/email?leadId=${leadId}`, headers, {
-        emails: [],
-      }),
-      fetchJson<{ activities: NormalizeArgs[4] }>(`https://api.lofty.com/v2.0/leads/${leadId}/activities`, headers, {
-        activities: [],
-      }),
-      fetchJson<{ texts: NormalizeArgs[5] }>(`https://api.lofty.com/v1.0/communication/text?leadId=${leadId}`, headers, {
-        texts: [],
-      }),
-    ]);
+    // Sequential with delays, not Promise.all — firing all 6 requests at once
+    // triggers Lofty's per-second rate limit on cadence runs that hit many leads.
+    const leadData = await fetchJson<{ lead: NormalizeArgs[0] }>(`https://api.lofty.com/v1.0/leads/${leadId}`, headers, {
+      lead: undefined as unknown as NormalizeArgs[0],
+    });
+    await sleep(80);
+    const notesData = await fetchJson<{ notes: NormalizeArgs[1] }>(`https://api.lofty.com/v1.0/notes?leadId=${leadId}`, headers, {
+      notes: [],
+    });
+    await sleep(80);
+    const callHistoryData = await fetchJson<{ calls: NormalizeArgs[2] }>(
+      `https://api.lofty.com/v1.0/communication/call?leadId=${leadId}`,
+      headers,
+      { calls: [] },
+    );
+    await sleep(80);
+    const emailHistoryData = await fetchJson<{ emails: NormalizeArgs[3] }>(
+      `https://api.lofty.com/v1.0/communication/email?leadId=${leadId}`,
+      headers,
+      { emails: [] },
+    );
+    await sleep(80);
+    const activitiesData = await fetchJson<{ activities: NormalizeArgs[4] }>(
+      `https://api.lofty.com/v2.0/leads/${leadId}/activities`,
+      headers,
+      { activities: [] },
+    );
+    await sleep(80);
+    const textHistoryData = await fetchJson<{ texts: NormalizeArgs[5] }>(
+      `https://api.lofty.com/v1.0/communication/text?leadId=${leadId}`,
+      headers,
+      { texts: [] },
+    );
 
     if (!leadData.lead) {
       throw new Error(`Lofty returned no lead data for leadId=${leadId} — see [lofty] log line above for the HTTP status`);

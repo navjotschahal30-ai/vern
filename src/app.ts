@@ -65,14 +65,15 @@ const DAILY_ROSTER_CAPS: Record<'hot' | 'warm' | 'ghost', number> = { hot: 10, w
 // Throttles the qualification pass — fetching+qualifying all 681 leads at
 // once would fire ~4000 concurrent Lofty requests. Batches of this size run
 // their fetches in parallel (Promise.all) but batches themselves run one
-// after another.
-const DAILY_ROSTER_BATCH_SIZE = Number(process.env.DAILY_ROSTER_BATCH_SIZE) || 10;
+// after another, spaced out by INTER_BATCH_DELAY_MS so bursts don't stack.
+const DAILY_ROSTER_BATCH_SIZE = Number(process.env.DAILY_ROSTER_BATCH_SIZE) || 5;
+const INTER_BATCH_DELAY_MS = 500;
 
 // Lofty 429s show up batch-wide rather than on isolated leads, so a hit gets
 // retried (only the rate-limited leads, not the whole batch) with doubling
-// backoff before being recorded as a permanent skip.
+// backoff before being recorded as a permanent skip: 2s, 4s, 8s, 16s, 32s.
 const BATCH_RETRY_BASE_DELAY_MS = 2000;
-const MAX_BATCH_RETRIES = 3;
+const MAX_BATCH_RETRIES = 5;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -111,11 +112,39 @@ async function qualifyBatchWithBackoff(batch: string[]): Promise<QualifyBatchRes
       return settled.concat(rateLimited);
     }
 
-    await sleep(BATCH_RETRY_BASE_DELAY_MS * 2 ** attempt);
+    const delay = BATCH_RETRY_BASE_DELAY_MS * 2 ** attempt;
+    console.warn(
+      `[cadence] 429 backoff: retrying ${rateLimited.length} lead(s), attempt ${attempt + 1}/${MAX_BATCH_RETRIES}, waiting ${delay}ms`,
+    );
+    await sleep(delay);
     pending = rateLimited.map((result) => result.leadId);
   }
 
   return settled;
+}
+
+/** Runs `batchFn` over `items` in DAILY_ROSTER_BATCH_SIZE chunks, sleeping INTER_BATCH_DELAY_MS between chunks (not after the last) so requests spread out instead of bursting. */
+async function mapInBatches<T, R>(items: T[], batchFn: (batch: T[]) => Promise<R[]>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += DAILY_ROSTER_BATCH_SIZE) {
+    const batch = items.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+    results.push(...(await batchFn(batch)));
+    if (i + DAILY_ROSTER_BATCH_SIZE < items.length) {
+      await sleep(INTER_BATCH_DELAY_MS);
+    }
+  }
+  return results;
+}
+
+/** Same chunking/spacing as mapInBatches, for batch steps with no per-item return value (e.g. tag writes). */
+async function forEachInBatches<T>(items: T[], batchFn: (batch: T[]) => Promise<void>): Promise<void> {
+  for (let i = 0; i < items.length; i += DAILY_ROSTER_BATCH_SIZE) {
+    const batch = items.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+    await batchFn(batch);
+    if (i + DAILY_ROSTER_BATCH_SIZE < items.length) {
+      await sleep(INTER_BATCH_DELAY_MS);
+    }
+  }
 }
 
 interface RosterSelection {
@@ -136,17 +165,13 @@ async function selectDailyRoster(leadIds: string[]): Promise<{ selected: RosterS
   const skipped: SkippedLead[] = [];
   const qualified: Array<{ leadId: string; qualification: LeadQualification }> = [];
 
-  for (let i = 0; i < leadIds.length; i += DAILY_ROSTER_BATCH_SIZE) {
-    const batch = leadIds.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
-    const results = await qualifyBatchWithBackoff(batch);
-
-    for (const result of results) {
-      if (result.error !== undefined) {
-        skipped.push({ leadId: result.leadId, reason: result.error });
-        continue;
-      }
-      qualified.push({ leadId: result.leadId, qualification: result.qualification });
+  const results = await mapInBatches(leadIds, qualifyBatchWithBackoff);
+  for (const result of results) {
+    if (result.error !== undefined) {
+      skipped.push({ leadId: result.leadId, reason: result.error });
+      continue;
     }
+    qualified.push({ leadId: result.leadId, qualification: result.qualification });
   }
 
   const byTier: Record<'hot' | 'warm' | 'ghost', RosterCandidate[]> = { hot: [], warm: [], ghost: [] };
@@ -188,23 +213,16 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
  */
 async function tagLeadsOnly(leadIds: string[]): Promise<Record<LeadQualification['status'], number>> {
   const breakdown: Record<LeadQualification['status'], number> = { hot: 0, warm: 0, ghost: 0, blocked: 0 };
-  const tagged: Array<{ leadId: string; status: LeadQualification['status'] }> = [];
 
-  for (let i = 0; i < leadIds.length; i += DAILY_ROSTER_BATCH_SIZE) {
-    const batch = leadIds.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
-    const results = await qualifyBatchWithBackoff(batch);
+  const results = await mapInBatches(leadIds, qualifyBatchWithBackoff);
+  const tagged = results.flatMap((result) =>
+    result.error !== undefined ? [] : [{ leadId: result.leadId, status: result.qualification.status }],
+  );
 
-    for (const result of results) {
-      if (result.error !== undefined) continue;
-      tagged.push({ leadId: result.leadId, status: result.qualification.status });
-    }
-  }
-
-  for (let i = 0; i < tagged.length; i += DAILY_ROSTER_BATCH_SIZE) {
-    const batch = tagged.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
+  await forEachInBatches(tagged, async (batch) => {
     await Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status)));
     batch.forEach(({ status }) => breakdown[status]++);
-  }
+  });
 
   return breakdown;
 }
@@ -242,10 +260,9 @@ async function runTagOnlySampleJob(jobId: string): Promise<void> {
     const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
     const { selected, skipped } = await selectDailyRoster(leadIds);
 
-    for (let i = 0; i < selected.length; i += DAILY_ROSTER_BATCH_SIZE) {
-      const batch = selected.slice(i, i + DAILY_ROSTER_BATCH_SIZE);
-      await Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status)));
-    }
+    await forEachInBatches(selected, (batch) =>
+      Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status))).then(() => undefined),
+    );
 
     tagOnlySampleJobs.set(jobId, { status: 'completed', tagged: selected.length, skipped: skipped.length });
   } catch (error) {
