@@ -158,7 +158,7 @@ interface RosterSelection {
 }
 
 /**
- * Qualifies every assigned lead — in batches of DAILY_ROSTER_BATCH_SIZE,
+ * Qualifies the top 50 assigned leads — in batches of DAILY_ROSTER_BATCH_SIZE,
  * each fetched/qualified in parallel via Promise.all — then selects today's
  * roster once all batches are in: the top-scoring leads within each of the
  * hot/warm/ghost tiers (capped per DAILY_ROSTER_CAPS). Blocked/DNC leads and
@@ -256,13 +256,13 @@ const tagOnlySampleJobs = new Map<string, TagOnlySampleJob>();
 
 /**
  * Runs the exact same selection path /cadence/daily uses (selectDailyRoster:
- * qualify all 681, pick top 10 hot / 20 warm / 20 ghost), then tags just
+ * qualify top 50 leads, pick top 10 hot / 20 warm / 20 ghost), then tags just
  * those ~50 leads with VERN-STATE and skips SMS/email — a low-quota dry run
  * of tomorrow's real cadence path.
  */
 async function runTagOnlySampleJob(jobId: string): Promise<void> {
   try {
-    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
+    const leadIds = (await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID)).slice(0, 50);
     const { selected, skipped } = await selectDailyRoster(leadIds);
 
     await forEachInBatches(selected, (batch) =>
@@ -309,13 +309,13 @@ const dailyCadenceJobs = new Map<string, DailyCadenceJob>();
 
 /**
  * The actual /cadence/daily work, run detached from the request so a slow
- * Lofty pass (681 leads, rate-limit backoff included) can't trip Railway's
+ * Lofty pass (top 50 leads, rate-limit backoff included) can't trip Railway's
  * gateway timeout. Failures are caught here and recorded on the job rather
  * than thrown — there's no request left to propagate them to.
  */
 async function runDailyCadenceJob(jobId: string): Promise<void> {
   try {
-    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
+    const leadIds = (await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID)).slice(0, 50);
     const { selected, skipped: rosterSkipped } = await buildDailyRoster(leadIds);
     const { executed, skipped: executionSkipped } = await executeCadence(selected);
 
