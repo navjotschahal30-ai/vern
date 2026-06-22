@@ -15,7 +15,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function fetchJson<T>(url: string, headers: Record<string, string>, fallback: T): Promise<T> {
-  const response = await fetch(url, { headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let response: Response;
+  try {
+    response = await fetch(url, { headers, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn(`[lofty] timeout (>15s) on ${url}`);
+      throw new Error(`Lofty request timeout on ${url}`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (response.status === 429) {
     console.warn(`[lofty] 429 rate limited: GET ${url}`);
     throw new LoftyRateLimitError(url);
