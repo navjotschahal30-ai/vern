@@ -13,6 +13,7 @@ export interface TemplateVars {
   firstName: string;
   property?: string;
   city?: string;
+  marketData?: any;
 }
 
 type SmsTemplate = (vars: TemplateVars) => string;

@@ -15,11 +15,12 @@ export interface SkippedSmsResult {
   testMode: true;
 }
 
-function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
+function buildTemplateVars(leadProfile: LeadProfile, marketData?: any): TemplateVars {
   return {
     firstName: leadProfile.firstName ?? 'there',
     property: leadProfile.propertiesViewed?.[0]?.address,
     city: leadProfile.currentHomeAddress?.city || undefined,
+    marketData,
   };
 }
 
@@ -29,13 +30,14 @@ function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
 export async function sendSMS(
   leadProfile: LeadProfile,
   qualification: LeadQualification,
+  marketData?: any,
 ): Promise<SendSmsResult | SkippedSmsResult> {
   if (isTestMode() && !isNavjotPhone(leadProfile.phone)) {
     console.log(`[test] Skipping SMS to leadId=${leadProfile.leadId} (would send in production)`);
     return { sent: false, testMode: true };
   }
 
-  const vars = buildTemplateVars(leadProfile);
+  const vars = buildTemplateVars(leadProfile, marketData);
   const templateKey = selectTemplateKey(leadProfile, qualification);
   const content = SMS_TEMPLATES[templateKey](vars);
 
