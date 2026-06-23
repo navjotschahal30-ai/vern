@@ -1,5 +1,5 @@
 import { qualifyLead, LeadQualification } from './qualificationEngine';
-import { getLeadState, recordOutreach } from './stateEngine';
+import { getLeadState, tagLeadByQualification } from './stateEngine';
 import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logComplianceSkip, OutreachHistory } from '../config/compliance';
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
 import { LeadProfile } from '../schemas/leadProfile';
@@ -19,15 +19,19 @@ async function fetchMarketData(
   }
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const response = await fetch(
-      `${process.env.CONTENT_AGENT_URL || 'https://renewed-gratitude-production-0fb3.up.railway.app'}/market/analyze`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ city, neighborhood, propertyType }),
-        timeout: 5000,
-      },
+   `${process.env.CONTENT_AGENT_URL || 'https://renewed-gratitude-production-0fb3.up.railway.app'}/market/analyze`,
+    {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city, neighborhood, propertyType }),
+    signal: controller.signal,
+    },
     );
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       console.warn(`[market] Content Agent failed: ${response.status}`);
@@ -261,23 +265,20 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
       const qualification = qualifyLead(leadProfile);
 
       const marketData = await fetchMarketData(
-        leadProfile.currentHomeAddress?.city,
-        leadProfile.currentHomeAddress?.neighborhood,
-        leadProfile.propertyType,
+       leadProfile.currentHomeAddress?.city || null,
       );
 
-      const result =
-        decision.channel === 'sms'
-          ? await sendSMS(leadProfile, qualification, marketData)
-          : await sendEmail(leadProfile, qualification, marketData);
+      // Tag lead with qualification status
+      await tagLeadByQualification(decision.leadId, qualification);
 
-      await recordOutreach(decision.leadId, decision.channel);
+      // OUTREACH PAUSED — Skip SMS/email sending until market data is locked
+      const result = { success: true, message: 'Tagged only (outreach paused)' };
 
       executed.push({
         leadId: decision.leadId,
         channel: decision.channel,
-        sent: result.sent,
-        reason: result.sent ? decision.reason : 'Test mode: skipped — not Navjot',
+        sent: false,
+        reason: result.message,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);

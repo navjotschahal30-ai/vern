@@ -10,6 +10,8 @@
 // ---------------------------------------------------------------------------
 
 import { getLoftyHeaders } from '../config/loftyClient';
+import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
+import type { LeadQualification } from './qualificationEngine';
 
 const LOFTY_BASE_URL = 'https://api.lofty.com/v1.0';
 
@@ -86,6 +88,16 @@ export async function getLeadState(leadId: string): Promise<LeadState> {
     console.error(`getLeadState failed for leadId=${leadId}`, error);
     throw error;
   }
+}
+
+export async function tagLeadByQualification(leadId: string, qualification: LeadQualification): Promise<void> {
+  const lead = await fetchLeadProfile(leadId);
+  const tags = lead.tags || [];
+
+  const qualificationTag = `VERN-QUAL-${qualification.status.toUpperCase()}`;
+  const updatedTags = replaceTagsWithPrefix(tags, 'VERN-QUAL-', qualificationTag);
+
+  await writeLeadTags(leadId, updatedTags);
 }
 
 /**
