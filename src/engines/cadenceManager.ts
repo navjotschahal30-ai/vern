@@ -6,6 +6,41 @@ import { LeadProfile } from '../schemas/leadProfile';
 import { sendSMS } from '../outreach/smsExecutor';
 import { sendEmail } from '../outreach/emailExecutor';
 
+/**
+ * Fetches market data from Content Agent for dynamic message generation.
+ */
+async function fetchMarketData(
+  city: string | null,
+  neighborhood: string | null = null,
+  propertyType: string | null = null,
+): Promise<any> {
+  if (!city) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${process.env.CONTENT_AGENT_URL || 'https://renewed-gratitude-production-0fb3.up.railway.app'}/market/analyze`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ city, neighborhood, propertyType }),
+        timeout: 5000,
+      },
+    );
+
+    if (!response.ok) {
+      console.warn(`[market] Content Agent failed: ${response.status}`);
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    console.warn(`[market] Failed to fetch market data:`, error);
+    return null;
+  }
+}
+
 export interface CadenceDecision {
   leadId: string;
   channel: 'sms' | 'email';
@@ -225,10 +260,16 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
       const leadProfile = await fetchLeadProfile(decision.leadId);
       const qualification = qualifyLead(leadProfile);
 
+      const marketData = await fetchMarketData(
+        leadProfile.currentHomeAddress?.city,
+        leadProfile.currentHomeAddress?.neighborhood,
+        leadProfile.propertyType,
+      );
+
       const result =
         decision.channel === 'sms'
-          ? await sendSMS(leadProfile, qualification)
-          : await sendEmail(leadProfile, qualification);
+          ? await sendSMS(leadProfile, qualification, marketData)
+          : await sendEmail(leadProfile, qualification, marketData);
 
       await recordOutreach(decision.leadId, decision.channel);
 
