@@ -19,11 +19,12 @@ export interface SkippedEmailResult {
 // (core/message-generator.js), so Vern's outreach stays consistent with it.
 const AGENT_SIGNATURE = '\n\n--\nNavjot Singh\nnavjotchahal.ca\n519-505-5832';
 
-function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
+function buildTemplateVars(leadProfile: LeadProfile, marketData?: any): TemplateVars {
   return {
     firstName: leadProfile.firstName ?? 'there',
     property: leadProfile.propertiesViewed?.[0]?.address,
     city: leadProfile.currentHomeAddress?.city || undefined,
+    marketData,
   };
 }
 
@@ -33,13 +34,14 @@ function buildTemplateVars(leadProfile: LeadProfile): TemplateVars {
 export async function sendEmail(
   leadProfile: LeadProfile,
   qualification: LeadQualification,
+  marketData?: any,
 ): Promise<SendEmailResult | SkippedEmailResult> {
   if (isTestMode() && leadProfile.email !== navjotEmail) {
     console.log(`[test] Skipping email to leadId=${leadProfile.leadId} (would send in production)`);
     return { sent: false, testMode: true };
   }
 
-  const vars = buildTemplateVars(leadProfile);
+  const vars = buildTemplateVars(leadProfile, marketData);
   const templateKey = selectTemplateKey(leadProfile, qualification);
   const { subject, body } = EMAIL_TEMPLATES[templateKey](vars);
   const fullBody = `${body}${AGENT_SIGNATURE}`;
