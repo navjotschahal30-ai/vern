@@ -166,6 +166,35 @@ interface RosterSelection {
  * passed to executeCadence. Shared by /cadence/daily and
  * /cadence/tag-only-sample so both run the identical selection path.
  */
+async function selectDailyRosterWithTargets(allLeadIds: string[]): Promise<{ selected: RosterSelection[]; skipped: SkippedLead[] }> {
+  const batchSize = 100;
+  const targets = DAILY_ROSTER_CAPS; // { hot: 10, warm: 20, ghost: 20 }
+  const collected = { hot: 0, warm: 0, ghost: 0 };
+  const selected: RosterSelection[] = [];
+  const skipped: SkippedLead[] = [];
+
+  for (let i = 0; i < allLeadIds.length; i += batchSize) {
+    // Stop if all targets hit
+    if (collected.hot >= targets.hot && collected.warm >= targets.warm && collected.ghost >= targets.ghost) break;
+
+    const batch = allLeadIds.slice(i, i + batchSize);
+    const { selected: batchSelected, skipped: batchSkipped } = await selectDailyRoster(batch);
+
+    for (const item of batchSelected) {
+      const tier = item.status as keyof typeof targets;
+      if (collected[tier] < targets[tier]) {
+        selected.push(item);
+        collected[tier]++;
+      } else {
+        skipped.push({ leadId: item.leadId, reason: `Daily cap for ${tier} reached` });
+      }
+    }
+    skipped.push(...batchSkipped);
+  }
+
+  return { selected, skipped };
+}
+
 async function selectDailyRoster(leadIds: string[]): Promise<{ selected: RosterSelection[]; skipped: SkippedLead[] }> {
   const skipped: SkippedLead[] = [];
   const qualified: Array<{ leadId: string; qualification: LeadQualification }> = [];
@@ -206,7 +235,7 @@ async function selectDailyRoster(leadIds: string[]): Promise<{ selected: RosterS
 }
 
 async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]; skipped: SkippedLead[] }> {
-  const { selected, skipped } = await selectDailyRoster(leadIds);
+  const { selected, skipped } = await selectDailyRosterWithTargets(leadIds);
   return { selected: selected.map((candidate) => candidate.leadId), skipped };
 }
 
@@ -262,8 +291,8 @@ const tagOnlySampleJobs = new Map<string, TagOnlySampleJob>();
  */
 async function runTagOnlySampleJob(jobId: string): Promise<void> {
   try {
-    const leadIds = (await fetchAssignedLeadIds(LOFTY_USER_ID)).slice(0, 50);
-    const { selected, skipped } = await selectDailyRoster(leadIds);
+    const allLeadIds = await fetchAssignedLeadIds(LOFTY_USER_ID);
+    const { selected, skipped } = await selectDailyRosterWithTargets(allLeadIds);
 
     await forEachInBatches(selected, (batch) =>
       Promise.all(batch.map(({ leadId, status }) => updateLeadState(leadId, status))).then(() => undefined),
