@@ -55,7 +55,7 @@ app.post('/cadence', async (req: Request, res: Response) => {
   }
 });
 
-const NAVJOT_LOFTY_USER_ID = '844770719757219';
+const LOFTY_USER_ID = process.env.LOFTY_USER_ID || '844770719757219';
 
 // Mirrors CRM Agent's daily roster logic: qualify the full assigned book,
 // then take only the top-scoring leads per tier rather than contacting
@@ -234,7 +234,7 @@ async function tagLeadsOnly(leadIds: string[]): Promise<Record<LeadQualification
 
 app.post('/cadence/tag-only', async (_req: Request, res: Response) => {
   try {
-    const leadIds = await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID);
+    const leadIds = await fetchAssignedLeadIds(LOFTY_USER_ID);
     const breakdown = await tagLeadsOnly(leadIds);
     res.json(breakdown);
   } catch (error) {
@@ -262,7 +262,7 @@ const tagOnlySampleJobs = new Map<string, TagOnlySampleJob>();
  */
 async function runTagOnlySampleJob(jobId: string): Promise<void> {
   try {
-    const leadIds = (await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID)).slice(0, 50);
+    const leadIds = (await fetchAssignedLeadIds(LOFTY_USER_ID)).slice(0, 50);
     const { selected, skipped } = await selectDailyRoster(leadIds);
 
     await forEachInBatches(selected, (batch) =>
@@ -315,7 +315,7 @@ const dailyCadenceJobs = new Map<string, DailyCadenceJob>();
  */
 async function runDailyCadenceJob(jobId: string): Promise<void> {
   try {
-    const leadIds = (await fetchAssignedLeadIds(NAVJOT_LOFTY_USER_ID)).slice(0, 50);
+    const leadIds = (await fetchAssignedLeadIds(LOFTY_USER_ID)).slice(0, 50);
     const { selected, skipped: rosterSkipped } = await buildDailyRoster(leadIds);
     const { executed, skipped: executionSkipped } = await executeCadence(selected);
 

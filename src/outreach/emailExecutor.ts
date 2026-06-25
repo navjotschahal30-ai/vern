@@ -17,7 +17,7 @@ export interface SkippedEmailResult {
 
 // Matches the sign-off IDX Stalker already uses for Navjot's outbound email
 // (core/message-generator.js), so Vern's outreach stays consistent with it.
-const AGENT_SIGNATURE = '\n\n--\nNavjot Singh\nnavjotchahal.ca\n519-505-5832';
+const AGENT_SIGNATURE = `\n\n--\n${process.env.AGENT_NAME || 'Navjot Singh'}\n${process.env.AGENT_WEBSITE || 'navjotchahal.ca'}\n${process.env.AGENT_PHONE || '519-505-5832'}`;
 
 function buildTemplateVars(leadProfile: LeadProfile, marketData?: any): TemplateVars {
   return {

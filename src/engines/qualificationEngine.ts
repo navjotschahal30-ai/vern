@@ -15,7 +15,7 @@ export interface LeadQualification {
 // single owner — any other agent name or assignee means someone else
 // already has this relationship. Exported so compliance.ts enforces the
 // exact same "is this lead off-limits" rules instead of a second copy.
-export const OWN_AGENT_NAME = 'Navjot Singh';
+export const OWN_AGENT_NAME = process.env.AGENT_NAME || 'Navjot Singh';
 
 // LeadProfile has no explicit "DNC" boolean — that signal only shows up as
 // a free-text tag or note Q&A pair from Lofty, so we match on a pattern.
