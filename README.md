@@ -71,6 +71,31 @@ Add:
 - **Event Listener** — handles inbound SMS replies (STOP → DNC tag), email unsubscribes
 - **Daily Command Center** — reports today's hot calls, warm/ghost queues, and actions needed
 
+## Current Status (June 25, 2026)
+
+### Deployed
+- **Navjot Vern**: https://navjot-vern-production.up.railway.app (tag-only mode)
+- **Patty Vern**: https://patty-vern-production.up.railway.app (tag-only mode)
+- **Mode**: Qualification + tagging only — SMS/email paused pending market data
+
+### Qualification Targets (Per Agent, Daily)
+- Hot leads: 10
+- Warm leads: 20
+- Ghost leads: 20
+- Batching: Loops through all assigned leads until targets hit (fixed June 25)
+
+### Tags Active
+- `VERN-QUAL-HOT` / `VERN-QUAL-WARM` / `VERN-QUAL-GHOST` / `VERN-QUAL-BLOCKED`
+
+### Blocked (Awaiting Lofty)
+- **Market Data**: DLA token limited to eXp Realty listings only. VOW rejected. Awaiting Lofty support response for board-wide market data API access (24-48h ETA).
+- **Outreach paused** until market data locked (ensures accurate, data-driven messaging)
+
+### Not Yet Done
+- Email domain config (`teamMosaic.ca` SPF/DKIM)
+- SMS via Twilio
+- Aria SMS integration
+
 ## License
 
 Proprietary — Team Mosaic, eXp Realty
