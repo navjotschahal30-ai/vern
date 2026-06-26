@@ -1,114 +1,151 @@
-import { BaseAdapter } from './baseAdapter';
-import { ICRMAdapter, LeadProfile, CRMAdapterConfig } from './crmAdapter';
+import { LeadProfile, ICRMAdapter, CRMAdapterConfig } from './crmAdapter';
 
-interface LoftyLead {
+interface LoftyLeadData {
   id: string;
   firstName?: string;
   lastName?: string;
+  phoneNumber?: string;
   email?: string;
-  phone?: string;
-  mobilePhone?: string;
-  dateCreated?: string;
-  tags?: Array<{ tagName: string }>;
-  customFields?: Record<string, any>;
+  createdDate?: string;
+  lastContactDate?: string;
+  tags?: string[];
 }
 
-export class LoftyCRMAdapter extends BaseAdapter implements ICRMAdapter {
-  private baseUrl = 'https://lofty.techstacks.com/api';
-  private teamId: string;
-  private userId: string;
+interface LeadsResponse {
+  leads?: LoftyLeadData[];
+}
 
-  constructor(config: CRMAdapterConfig & { teamId: string; userId: string }) {
-    super(config);
-    this.teamId = config.teamId;
-    this.userId = config.userId;
+export class LoftyCRMAdapter implements ICRMAdapter {
+  private apiKey: string;
+  private baseUrl = 'https://api.lofty.com/v2.0';
+  private config: CRMAdapterConfig;
+
+  constructor(config: CRMAdapterConfig) {
+    this.apiKey = config.apiKey;
+    this.config = config;
   }
 
   async authenticate(): Promise<void> {
-    return this.handleError('authenticate', async () => {
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/identity`, {
-        headers: { Authorization: `token ${this.config.apiKey}` },
+    try {
+      const response = await fetch(`${this.baseUrl}/healthcheck`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
       });
-      if (!response.ok) throw new Error(`Auth failed: ${response.status}`);
-      this.log('info', 'Lofty authentication successful');
-    });
+      if (!response.ok) throw new Error('Authentication failed');
+    } catch (error) {
+      throw new Error(`Lofty auth failed: ${error}`);
+    }
   }
 
-  async getAssignedLeadIds(limit: number = 100, offset: number = 0): Promise<string[]> {
-    return this.handleError('getAssignedLeadIds', async () => {
-      const params = new URLSearchParams({
-        assignedUserId: this.userId,
-        limit: String(limit),
-        offset: String(offset),
+  async getAssignedLeadIds(limit = 100, offset = 0): Promise<string[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/leads?limit=${limit}&offset=${offset}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
       });
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/leads?${params}`, {
-        headers: { Authorization: `token ${this.config.apiKey}` },
-      });
-      if (!response.ok) throw new Error(`Failed to fetch leads: ${response.status}`);
-      const data = await response.json();
-      const leadIds = (data.leads || []).map((lead: LoftyLead) => lead.id);
-      this.log('debug', `Fetched ${leadIds.length} lead IDs`);
-      return leadIds;
-    });
+      const result = (await response.json()) as LeadsResponse;
+      return (result.leads || []).map((lead: LoftyLeadData) => lead.id);
+    } catch (error) {
+      console.error('[Lofty] Failed to get lead IDs:', error);
+      return [];
+    }
   }
 
   async getLeadProfile(leadId: string): Promise<LeadProfile> {
-    return this.handleError('getLeadProfile', async () => {
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/leads/${leadId}`, {
-        headers: { Authorization: `token ${this.config.apiKey}` },
+    try {
+      const response = await fetch(`${this.baseUrl}/leads/${leadId}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
       });
-      if (!response.ok) throw new Error(`Failed to fetch lead: ${response.status}`);
-      const data: LoftyLead = await response.json();
-      return this.mapLoftyLeadToProfile(data);
-    });
+      const data = (await response.json()) as LoftyLeadData;
+      return {
+        leadId: data.id,
+        name: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+        email: data.email,
+        phone: data.phoneNumber,
+        createdDate: data.createdDate ? new Date(data.createdDate) : new Date(),
+        lastContactDate: data.lastContactDate ? new Date(data.lastContactDate) : undefined,
+        tags: data.tags || [],
+      };
+    } catch (error) {
+      throw new Error(`Failed to get lead profile for ${leadId}: ${error}`);
+    }
   }
 
   async tagLeadByQualification(leadId: string, qualStatus: 'hot' | 'warm' | 'ghost' | 'blocked'): Promise<void> {
-    return this.handleError('tagLeadByQualification', async () => {
-      const tagName = `VERN-QUAL-${qualStatus.toUpperCase()}`;
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/leads/${leadId}/tags`, {
+    const tagName = `VERN-QUAL-${qualStatus.toUpperCase()}`;
+    try {
+      await fetch(`${this.baseUrl}/leads/${leadId}/tags`, {
         method: 'POST',
-        headers: { Authorization: `token ${this.config.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagName }),
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ tag: tagName }),
       });
-      if (!response.ok) throw new Error(`Failed to tag lead: ${response.status}`);
-      this.log('debug', `Tagged lead ${leadId} as ${qualStatus}`);
-    });
+    } catch (error) {
+      throw new Error(`Failed to tag lead ${leadId}: ${error}`);
+    }
   }
 
   async recordOutreach(leadId: string, record: any): Promise<void> {
-    return this.handleError('recordOutreach', async () => {
-      const noteContent = `[${record.type.toUpperCase()}] ${record.content}`;
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/leads/${leadId}/notes`, {
+    try {
+      await fetch(`${this.baseUrl}/leads/${leadId}/activities`, {
         method: 'POST',
-        headers: { Authorization: `token ${this.config.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: noteContent }),
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(record),
       });
-      if (!response.ok) throw new Error(`Failed to record outreach: ${response.status}`);
-      this.log('debug', `Recorded ${record.type} for lead ${leadId}`);
-    });
+    } catch (error) {
+      throw new Error(`Failed to record outreach for ${leadId}: ${error}`);
+    }
+  }
+
+  async isDNC(phoneOrEmail: string): Promise<boolean> {
+    // Placeholder - check against DNC list if available
+    return false;
+  }
+
+  async recordDNC(phoneOrEmail: string, reason: string): Promise<void> {
+    try {
+      await fetch(`${this.baseUrl}/dnc`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contact: phoneOrEmail, reason }),
+      });
+    } catch (error) {
+      throw new Error(`Failed to record DNC for ${phoneOrEmail}: ${error}`);
+    }
   }
 
   async updateLeadState(leadId: string, stateKey: string, value: any): Promise<void> {
-    return this.handleError('updateLeadState', async () => {
-      const tagValue = typeof value === 'object' ? value.toISOString() : String(value);
-      const tagName = `${stateKey}:${tagValue}`;
-      const response = await fetch(`${this.baseUrl}/teams/${this.teamId}/leads/${leadId}/tags`, {
-        method: 'POST',
-        headers: { Authorization: `token ${this.config.apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagName }),
+    try {
+      await fetch(`${this.baseUrl}/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [stateKey]: value }),
       });
-      if (!response.ok) throw new Error(`Failed to update lead state: ${response.status}`);
-      this.log('debug', `Updated lead state: ${stateKey}=${tagValue}`);
-    });
+    } catch (error) {
+      throw new Error(`Failed to update lead state for ${leadId}: ${error}`);
+    }
   }
 
   async getLeadState(leadId: string, stateKey: string): Promise<string | null> {
-    return this.handleError('getLeadState', async () => {
-      const profile = await this.getLeadProfile(leadId);
-      const stateTag = profile.tags.find(tag => tag.startsWith(stateKey + ':'));
-      return stateTag ? stateTag.substring(stateKey.length + 1) : null;
-    });
+    try {
+      const response = await fetch(`${this.baseUrl}/leads/${leadId}`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` },
+      });
+      const data = (await response.json()) as Record<string, any>;
+      return data[stateKey] || null;
+    } catch (error) {
+      console.error(`Failed to get lead state for ${leadId}:`, error);
+      return null;
+    }
   }
 
   async healthCheck(): Promise<boolean> {
@@ -118,13 +155,5 @@ export class LoftyCRMAdapter extends BaseAdapter implements ICRMAdapter {
     } catch {
       return false;
     }
-  }
-
-  private mapLoftyLeadToProfile(loftyLead: LoftyLead): LeadProfile {
-    const name = [loftyLead.firstName, loftyLead.lastName].filter(Boolean).join(' ') || 'Unknown';
-    const phone = loftyLead.mobilePhone || loftyLead.phone;
-    const createdDate = loftyLead.dateCreated ? new Date(loftyLead.dateCreated) : new Date();
-    const tags = (loftyLead.tags || []).map(t => t.tagName);
-    return { leadId: loftyLead.id, name, email: loftyLead.email, phone, createdDate, tags, customFields: loftyLead.customFields || {} };
   }
 }
