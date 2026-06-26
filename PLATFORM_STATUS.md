@@ -37,10 +37,27 @@ Three agents live in Railway, all integrated with Lofty. This is the master stat
 ## Monthly Cost
 ~$5-10 (Railway + Lofty included)
 
-## Next Steps
-1. Lofty market data response (BLOCKS OUTREACH)
-2. Email domain config (compliance)
-3. SMS setup (feature)
+## Next Steps (Priority Order)
+
+1. **Lofty Market Data** (BLOCKING OUTREACH)
+   - Get board-wide market stats access
+   - Timeline: Awaiting response (24-48h)
+   - Unblocks: Vern SMS/email outreach with accurate market messaging
+
+2. **Email Domain Config** (COMPLIANCE)
+   - Configure `teamMosaic.ca` SPF/DKIM in Lofty
+   - Timeline: TBD (Team Mosaic IT)
+   - Impact: Adds unsubscribe links to emails
+
+3. **Aria Google Sheets Bug** (QUALITY)
+   - Fix: Reuse existing sheet instead of creating new one per session
+   - Impact: Consolidate lead logs, reduce Google Drive clutter
+   - Timeline: Low priority
+
+4. **SMS Setup** (FEATURE)
+   - Wire Twilio to Aria + Vern
+   - Cost: ~$0.0075/message
+   - Timeline: After outreach unlocked
 
 ---
 **Last Updated**: June 25, 2026
