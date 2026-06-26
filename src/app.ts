@@ -38,8 +38,8 @@ app.post('/webhook', async (req: Request, res: Response) => {
       return;
     }
 
-    await handleLoftyEvent(payload);
-    res.json({ status: 'processed', eventType: payload?.eventType ?? null });
+    const result = await handleLoftyEvent(payload);
+    res.json({ ...result, eventType: payload?.eventType ?? null });
   } catch (error) {
     sendError(res, error);
   }
