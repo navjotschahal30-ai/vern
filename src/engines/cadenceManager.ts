@@ -1,19 +1,22 @@
 import { qualifyLead, LeadQualification } from './qualificationEngine';
-import { getLeadState, tagLeadByQualification } from './stateEngine';
+import { getLeadState, tagLeadByQualification, recordOutreach } from './stateEngine';
 import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logComplianceSkip, OutreachHistory } from '../config/compliance';
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
 import { LeadProfile } from '../schemas/leadProfile';
-import { sendSMS } from '../outreach/smsExecutor';
+import { MarketSnapshot } from '../schemas/marketSnapshot';
 import { sendEmail } from '../outreach/emailExecutor';
 
 /**
  * Fetches market data from Content Agent for dynamic message generation.
+ * Response shape must match MarketSnapshot (src/schemas/marketSnapshot.ts)
+ * — update that file, not this one, if Content Agent's actual payload
+ * (VOW today, VOW + Cornerstone soon) differs.
  */
 async function fetchMarketData(
   city: string | null,
   neighborhood: string | null = null,
   propertyType: string | null = null,
-): Promise<any> {
+): Promise<MarketSnapshot | null> {
   if (!city) {
     return null;
   }
@@ -38,7 +41,10 @@ async function fetchMarketData(
       return null;
     }
 
-    return response.json();
+    // Content Agent's response doesn't include the city it was asked
+    // about — attach it here so templates can reference it.
+    const data = (await response.json()) as Omit<MarketSnapshot, 'city'>;
+    return { ...data, city };
   } catch (error) {
     console.warn(`[market] Failed to fetch market data:`, error);
     return null;
@@ -234,9 +240,14 @@ export interface ExecuteCadenceResult {
  * sends. Re-fetches each scheduled lead's profile right before sending
  * (rather than reusing buildCadenceDetailed's copy) so a send can't act on
  * data that's gone stale between scheduling and execution. recordOutreach
- * always runs for a scheduled lead, even when smsExecutor/emailExecutor
- * skip the actual send under TEST_MODE — Vern's own tags must reflect what
- * the cadence *decided* regardless of whether TEST_MODE suppressed delivery.
+ * always runs after a real send attempt, even when emailExecutor skips the
+ * actual send under TEST_MODE — Vern's own tags must reflect what the
+ * cadence *decided* regardless of whether TEST_MODE suppressed delivery.
+ *
+ * Email-only rollout: SMS stays paused (leads still get tagged/scheduled
+ * on the SMS channel by qualificationEngine, but executeCadence never
+ * calls sendSMS) until SMS is deliberately turned back on. See
+ * docs/VERN_STATUS.md for the outreach-pause history.
  *
  * A frequency-capped lead stays in buildCadenceDetailed's `scheduled` list
  * with a future sendAfter rather than moving to `skipped` (see
@@ -264,21 +275,28 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
       const leadProfile = await fetchLeadProfile(decision.leadId);
       const qualification = qualifyLead(leadProfile);
 
-      const marketData = await fetchMarketData(
-       leadProfile.currentHomeAddress?.city || null,
-      );
-
-      // Tag lead with qualification status
       await tagLeadByQualification(decision.leadId, qualification);
 
-      // OUTREACH PAUSED — Skip SMS/email sending until market data is locked
-      const result = { success: true, message: 'Tagged only (outreach paused)' };
+      if (decision.channel === 'sms') {
+        executed.push({
+          leadId: decision.leadId,
+          channel: decision.channel,
+          sent: false,
+          reason: 'Tagged only (SMS outreach paused — email-only rollout)',
+        });
+        continue;
+      }
+
+      const marketData = await fetchMarketData(leadProfile.currentHomeAddress?.city || null);
+      const result = await sendEmail(leadProfile, qualification, marketData ?? undefined);
+
+      await recordOutreach(decision.leadId, 'email');
 
       executed.push({
         leadId: decision.leadId,
         channel: decision.channel,
-        sent: false,
-        reason: result.message,
+        sent: result.sent,
+        reason: result.sent ? decision.reason : 'Test mode: skipped — not Navjot',
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);

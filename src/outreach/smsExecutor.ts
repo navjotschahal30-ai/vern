@@ -1,6 +1,7 @@
 import { LeadProfile } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { SMS_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
+import { MarketSnapshot } from '../schemas/marketSnapshot';
 import { getLoftyHeaders } from '../config/loftyClient';
 import { isTestMode, isNavjotPhone } from '../config/testMode';
 
@@ -15,7 +16,7 @@ export interface SkippedSmsResult {
   testMode: true;
 }
 
-function buildTemplateVars(leadProfile: LeadProfile, marketData?: any): TemplateVars {
+function buildTemplateVars(leadProfile: LeadProfile, marketData?: MarketSnapshot): TemplateVars {
   return {
     firstName: leadProfile.firstName ?? 'there',
     property: leadProfile.propertiesViewed?.[0]?.address,
@@ -30,7 +31,7 @@ function buildTemplateVars(leadProfile: LeadProfile, marketData?: any): Template
 export async function sendSMS(
   leadProfile: LeadProfile,
   qualification: LeadQualification,
-  marketData?: any,
+  marketData?: MarketSnapshot,
 ): Promise<SendSmsResult | SkippedSmsResult> {
   if (isTestMode() && !isNavjotPhone(leadProfile.phone)) {
     console.log(`[test] Skipping SMS to leadId=${leadProfile.leadId} (would send in production)`);

@@ -105,6 +105,8 @@ export interface LeadProfile {
     address: string;
     price: number;
     mls: string;
+    city?: string;
+    state?: string;
   }> | null;
 
   /** Aggregated search/inquiry criteria for properties the lead is
@@ -155,6 +157,11 @@ interface LoftyProperty {
   streetAddress: string;
   price: number;
   listingId: string;
+  // Optional — used to build a full listing-detail slug when Lofty
+  // includes them on leadPropertyList; not confirmed present on every
+  // lead payload, so callers must treat these as possibly undefined.
+  city?: string;
+  state?: string;
 }
 
 interface LoftyInquiry {
@@ -418,6 +425,8 @@ export function normalizeLeadProfile(
           address: property.streetAddress,
           price: property.price,
           mls: property.listingId,
+          city: property.city,
+          state: property.state,
         }))
       : null,
     inquiredProperties: loftyLead.leadInquiry

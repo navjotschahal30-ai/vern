@@ -31,7 +31,7 @@ const COMPLIANCE_BYPASS_TAG = 'COMPLIANCE-OVERRIDE';
 // TCPA/CASL-driven frequency caps.
 const SMS_HOT_CAP_DAYS = 3;
 const SMS_WARM_CAP_DAYS = 7;
-const EMAIL_CAP_DAYS = 7;
+const EMAIL_CAP_DAYS = 15;
 const BLANKET_COOLDOWN_HOURS = 24;
 
 // SMS business-hours window (TCPA requires consent-aware, reasonable-hours
