@@ -14,11 +14,10 @@ Three agents live in Railway, all integrated with Lofty. This is the master stat
 - **Targets**: 10 hot, 20 warm, 20 ghost per agent per day
 - **Last update**: Batching logic (June 25) — loops through full roster to hit targets
 
-### 2. Aria (Receptionist/Intake Chatbot)
-- **Repo**: `navjot-receptionist-agent`
-- **URL**: aria-production.up.railway.app
-- **Status**: ✅ Live
-- **Known issue**: Creates new Google Sheet per session (should reuse)
+### 2. Mosaic Intelligence (Receptionist/Intake Chatbot)
+- **Repo**: TBD — replaces `navjot-receptionist-agent` (Aria)
+- **URL**: TBD — replaces aria-production.up.railway.app
+- **Status**: Replacing Aria (update once Mosaic Intelligence is deployed)
 
 ### 3. Content Agent (Market Intelligence)
 - **Repo**: `navjot-content-agent`
@@ -49,13 +48,8 @@ Three agents live in Railway, all integrated with Lofty. This is the master stat
    - Timeline: TBD (Team Mosaic IT)
    - Impact: Adds unsubscribe links to emails
 
-3. **Aria Google Sheets Bug** (QUALITY)
-   - Fix: Reuse existing sheet instead of creating new one per session
-   - Impact: Consolidate lead logs, reduce Google Drive clutter
-   - Timeline: Low priority
-
-4. **SMS Setup** (FEATURE)
-   - Wire Twilio to Aria + Vern
+3. **SMS Setup** (FEATURE)
+   - Wire Twilio to Mosaic Intelligence + Vern
    - Cost: ~$0.0075/message
    - Timeline: After outreach unlocked
 
