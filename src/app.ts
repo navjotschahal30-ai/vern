@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
 import { handleLoftyEvent } from './handlers/eventListener';
 import { handleLoftyWebhook, fetchAssignedLeadIds, fetchLeadProfile, LoftyRateLimitError } from './handlers/loftyWebhookHandler';
-import { executeCadence, SkippedLead } from './engines/cadenceManager';
+import { executeCadence, SkippedLead, ExecutedEntry } from './engines/cadenceManager';
 import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
 import { updateLeadState } from './engines/stateEngine';
@@ -329,6 +329,12 @@ interface DailyCadenceJob {
   executed: number;
   skipped: number;
   error?: string;
+  // Full per-lead detail (including rendered subject/emailBody for every
+  // email that was sent or would have sent under TEST_MODE) — lets
+  // GET /cadence/daily/:jobId double as a review log for that day's run
+  // without needing to open each lead in Lofty. In-memory/temporary, same
+  // as the rest of this job map — gone on restart.
+  emails?: ExecutedEntry[];
 }
 
 // In-memory only — fine for a single-instance service; a job's status is
@@ -352,6 +358,7 @@ async function runDailyCadenceJob(jobId: string): Promise<void> {
       status: 'completed',
       executed: executed.length,
       skipped: rosterSkipped.length + executionSkipped.length,
+      emails: executed,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

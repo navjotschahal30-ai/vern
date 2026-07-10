@@ -4,6 +4,7 @@ import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logCo
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
 import { LeadProfile } from '../schemas/leadProfile';
 import { MarketSnapshot } from '../schemas/marketSnapshot';
+import { TemplateKey } from '../config/templates';
 import { sendEmail } from '../outreach/emailExecutor';
 
 /**
@@ -228,6 +229,12 @@ export interface ExecutedEntry {
   channel: 'sms' | 'email';
   sent: boolean;
   reason: string;
+  // Populated only for email-channel entries that actually got rendered —
+  // lets a caller review exactly what was sent (or would have sent under
+  // TEST_MODE) without going to Lofty's UI per lead.
+  templateKey?: TemplateKey;
+  subject?: string;
+  emailBody?: string;
 }
 
 export interface ExecuteCadenceResult {
@@ -297,6 +304,9 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
         channel: decision.channel,
         sent: result.sent,
         reason: result.sent ? decision.reason : 'Test mode: skipped — not Navjot',
+        templateKey: result.templateKey,
+        subject: result.subject,
+        emailBody: result.body,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
