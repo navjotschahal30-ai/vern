@@ -6,6 +6,7 @@ import { LeadProfile } from '../schemas/leadProfile';
 import { MarketSnapshot } from '../schemas/marketSnapshot';
 import { TemplateKey } from '../config/templates';
 import { sendEmail } from '../outreach/emailExecutor';
+import { logEmailAttempt } from '../store/emailLog';
 
 /**
  * Fetches market data from Content Agent for dynamic message generation.
@@ -296,14 +297,23 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
 
       const marketData = await fetchMarketData(leadProfile.currentHomeAddress?.city || null);
       const result = await sendEmail(leadProfile, qualification, marketData ?? undefined);
+      const reason = result.sent ? decision.reason : 'Test mode: skipped — not Navjot';
 
       await recordOutreach(decision.leadId, 'email');
+      logEmailAttempt({
+        leadId: decision.leadId,
+        sent: result.sent,
+        templateKey: result.templateKey,
+        subject: result.subject,
+        body: result.body,
+        reason,
+      });
 
       executed.push({
         leadId: decision.leadId,
         channel: decision.channel,
         sent: result.sent,
-        reason: result.sent ? decision.reason : 'Test mode: skipped — not Navjot',
+        reason,
         templateKey: result.templateKey,
         subject: result.subject,
         emailBody: result.body,

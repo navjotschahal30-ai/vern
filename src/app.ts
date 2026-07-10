@@ -7,6 +7,7 @@ import { executeCadence, SkippedLead, ExecutedEntry } from './engines/cadenceMan
 import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
 import { updateLeadState } from './engines/stateEngine';
+import { getRecentEmails, getEmailsForLead, getEmailById } from './store/emailLog';
 
 dotenv.config();
 
@@ -383,6 +384,47 @@ app.get('/cadence/daily/:jobId', (req: Request<{ jobId: string }>, res: Response
     return;
   }
   res.json(job);
+});
+
+// Temporary review log (SQLite, see src/store/emailLog.ts) of every email
+// Vern has attempted to send — survives across daily runs (unlike the
+// in-memory dailyCadenceJobs map above), but resets on Railway
+// redeploy/restart unless a Volume is mounted at EMAIL_LOG_DB_PATH.
+app.get('/emails/recent', (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 500);
+    res.json({ emails: getRecentEmails(limit) });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+app.get('/emails/lead/:leadId', (req: Request<{ leadId: string }>, res: Response) => {
+  try {
+    res.json({ emails: getEmailsForLead(req.params.leadId) });
+  } catch (error) {
+    sendError(res, error);
+  }
+});
+
+app.get('/emails/:id', (req: Request<{ id: string }>, res: Response) => {
+  const email = getEmailById(Number(req.params.id));
+  if (!email) {
+    res.status(404).json({ error: 'Unknown email id', code: 404 });
+    return;
+  }
+  res.json(email);
+});
+
+// Renders the actual HTML instead of a JSON-escaped string — open this
+// URL directly in a browser to see exactly what the lead would see.
+app.get('/emails/:id/preview', (req: Request<{ id: string }>, res: Response) => {
+  const email = getEmailById(Number(req.params.id));
+  if (!email) {
+    res.status(404).send('Unknown email id');
+    return;
+  }
+  res.set('Content-Type', 'text/html').send(email.body);
 });
 
 app.get('/daily-report', async (req: Request, res: Response) => {
