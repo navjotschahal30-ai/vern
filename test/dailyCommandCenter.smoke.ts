@@ -118,6 +118,9 @@ addLead('D1', { source: 'Website', firstName: 'Dnc-D1', phones: ['555-0400'], le
   if (url.includes('/communication/email')) return { ok: true, json: async () => ({ emails: [] }) };
   if (url.includes('/communication/text')) return { ok: true, json: async () => ({ texts: [] }) };
   if (url.includes('/activities')) return { ok: true, json: async () => ({ activities: [] }) };
+  if (url.includes('/systemLogs')) return { ok: true, json: async () => ({ timeLines: [] }) };
+  if (url.includes('/tasks')) return { ok: true, json: async () => ({ tasks: [] }) };
+  if (url.includes('/calendar')) return { ok: true, json: async () => ({ data: { items: [] } }) };
 
   return { ok: true, json: async () => ({ lead: { ...lead.raw, tags: lead.tags.map((t) => ({ tagName: t })) } }) };
 };

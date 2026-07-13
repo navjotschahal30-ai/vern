@@ -134,6 +134,9 @@ addLead(
   if (url.includes('/communication/email')) return { ok: true, json: async () => ({ emails: [] }) };
   if (url.includes('/communication/text')) return { ok: true, json: async () => ({ texts: [] }) };
   if (url.includes('/activities')) return { ok: true, json: async () => ({ activities: [] }) };
+  if (url.includes('/systemLogs')) return { ok: true, json: async () => ({ timeLines: [] }) };
+  if (url.includes('/tasks')) return { ok: true, json: async () => ({ tasks: [] }) };
+  if (url.includes('/calendar')) return { ok: true, json: async () => ({ data: { items: [] } }) };
 
   // GET /v1.0/leads/{leadId} — used by both fetchLeadProfile and getLeadState
   return {

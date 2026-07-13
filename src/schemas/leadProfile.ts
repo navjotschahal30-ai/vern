@@ -137,6 +137,30 @@ export interface LeadProfile {
 
   /** ISO timestamp of the most recent update to this lead. */
   lastUpdatedAt: string;
+
+  /** Open (unfinished) agent tasks/follow-ups on this lead, from Lofty's Tasks v2 API. */
+  openTasks: Array<{
+    id: string;
+    content: string | null;
+    startAt: string | null;
+  }>;
+
+  /** Calendar entries (showings/appointments) tied to this lead — distinct
+   *  from openTasks, which is agent to-dos rather than scheduled meetings. */
+  upcomingAppointments: Array<{
+    id: string;
+    title: string | null;
+    startAt: string | null;
+    finished: boolean;
+  }>;
+
+  /** Stage/assignment/routing change history from Lofty's system log audit
+   *  trail. Excludes calls/texts/emails/notes (see touchHistory for those) —
+   *  this is the only source for "pipeline moved to Warm" type signals. */
+  stageHistory: Array<{
+    timelineType: string;
+    timestamp: string;
+  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +255,30 @@ interface LoftyTextHistoryItem {
 interface LoftyActivityItem {
   type?: string;
   createTime?: string | number;
+}
+
+// GET /v1.0/systemLogs?leadId={leadId} — audit trail of stage/assignment/
+// routing changes. Explicitly excludes calls/texts/emails/notes/activities
+// (those all come from the endpoints above).
+interface LoftySystemLog {
+  timelineType?: string;
+  timelineTime?: string | number;
+}
+
+// GET /v2.0/tasks?leadId={leadId} — agent to-dos/follow-ups on this lead.
+interface LoftyTask {
+  id: number | string;
+  content?: string | null;
+  startAt?: string | number | null;
+}
+
+// GET /v2.0/calendar?leadId={leadId} — showings/appointments (as opposed to
+// /v2.0/tasks, which is agent to-dos rather than scheduled meetings).
+interface LoftyCalendarEvent {
+  id: number | string;
+  title?: string | null;
+  startAt?: string | number | null;
+  finished?: boolean;
 }
 
 const LEAD_TYPE_TO_INTENT: Record<number, LeadProfile['leadIntent']> = {
@@ -389,6 +437,9 @@ export function normalizeLeadProfile(
   emailHistory: LoftyEmailHistoryItem[] = [],
   activities: LoftyActivityItem[] = [],
   textHistory: LoftyTextHistoryItem[] = [],
+  systemLogs: LoftySystemLog[] = [],
+  tasks: LoftyTask[] = [],
+  calendarEvents: LoftyCalendarEvent[] = [],
 ): LeadProfile {
   const hasAddress =
     loftyLead.streetAddress || loftyLead.city || loftyLead.state || loftyLead.zipCode;
@@ -442,5 +493,22 @@ export function normalizeLeadProfile(
     engagement: computeEngagement(touchHistory),
     capturedAt: toIsoString(loftyLead.createTime),
     lastUpdatedAt: toIsoString(loftyLead.lastUpdateTime),
+    openTasks: tasks.map((task) => ({
+      id: String(task.id),
+      content: task.content ?? null,
+      startAt: task.startAt ? toIsoString(task.startAt) : null,
+    })),
+    upcomingAppointments: calendarEvents.map((event) => ({
+      id: String(event.id),
+      title: event.title ?? null,
+      startAt: event.startAt ? toIsoString(event.startAt) : null,
+      finished: event.finished ?? false,
+    })),
+    stageHistory: systemLogs
+      .filter((log) => log.timelineType && log.timelineTime)
+      .map((log) => ({
+        timelineType: log.timelineType as string,
+        timestamp: toIsoString(log.timelineTime),
+      })),
   };
 }

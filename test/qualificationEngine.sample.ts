@@ -39,6 +39,9 @@ const norwichLead: LeadProfile = {
   },
   capturedAt: '2026-06-15T14:00:00.000Z',
   lastUpdatedAt: '2026-06-16T18:00:00.000Z',
+  openTasks: [],
+  upcomingAppointments: [],
+  stageHistory: [],
 };
 
 const leadWithBuyerAgent: LeadProfile = {

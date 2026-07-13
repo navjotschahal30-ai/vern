@@ -49,6 +49,9 @@ function makeLead(overrides: Partial<LeadProfile> = {}): LeadProfile {
     engagement: buildEngagement(touchHistory),
     capturedAt: daysAgoIso(20),
     lastUpdatedAt: daysAgoIso(2),
+    openTasks: [],
+    upcomingAppointments: [],
+    stageHistory: [],
     ...overrides,
   };
 }

@@ -58,9 +58,15 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
       lead: undefined as unknown as NormalizeArgs[0],
     });
     await sleep(80);
-    const notesData = await fetchJson<{ notes: NormalizeArgs[1] }>(`https://api.lofty.com/v1.0/notes?leadId=${leadId}`, headers, {
-      notes: [],
-    });
+    // Explicit limit=100 (Lofty's documented max) — omitting it defaults to a
+    // small page size that silently drops older notes on any lead with more
+    // than a handful logged, which is how a manual call-log note went missing
+    // from a prior fetch.
+    const notesData = await fetchJson<{ notes: NormalizeArgs[1] }>(
+      `https://api.lofty.com/v1.0/notes?leadId=${leadId}&limit=100`,
+      headers,
+      { notes: [] },
+    );
     await sleep(80);
     const callHistoryData = await fetchJson<{ calls: NormalizeArgs[2] }>(
       `https://api.lofty.com/v1.0/communication/call?leadId=${leadId}`,
@@ -88,6 +94,30 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
       headers,
       { texts: [] },
     );
+    await sleep(80);
+    // Stage/assignment/routing change audit trail — explicitly excludes
+    // calls/texts/emails/notes (those come from the endpoints above), so this
+    // is the only source for "lead moved to Warm on <date>" type signals.
+    const systemLogsData = await fetchJson<{ timeLines: NormalizeArgs[6] }>(
+      `https://api.lofty.com/v1.0/systemLogs?leadId=${leadId}&pageSize=100`,
+      headers,
+      { timeLines: [] },
+    );
+    await sleep(80);
+    const tasksData = await fetchJson<{ tasks: NormalizeArgs[7] }>(
+      `https://api.lofty.com/v2.0/tasks?leadId=${leadId}`,
+      headers,
+      { tasks: [] },
+    );
+    await sleep(80);
+    // Showings/appointments tied to this lead (as opposed to /v2.0/tasks,
+    // which is agent to-dos) — a booked appointment is a strong signal
+    // qualificationEngine currently has no way to see.
+    const calendarData = await fetchJson<{ data: { items: NormalizeArgs[8] } }>(
+      `https://api.lofty.com/v2.0/calendar?leadId=${leadId}&pageSize=100`,
+      headers,
+      { data: { items: [] } },
+    );
 
     if (!leadData.lead) {
       throw new Error(`Lofty returned no lead data for leadId=${leadId} — see [lofty] log line above for the HTTP status`);
@@ -100,6 +130,9 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
       emailHistoryData.emails,
       activitiesData.activities,
       textHistoryData.texts,
+      systemLogsData.timeLines,
+      tasksData.tasks,
+      calendarData.data.items,
     );
   } catch (error) {
     console.error(`fetchLeadProfile failed for leadId=${leadId}`, error);
@@ -116,6 +149,32 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
 export async function handleLoftyWebhook(payload: any): Promise<LeadProfile> {
   const leadId = payload.updatedLead[0].leadId;
   return fetchLeadProfile(leadId);
+}
+
+export interface CallSummary {
+  status: number;
+  text: string;
+  summary: string;
+  score: number;
+  comment: string;
+  keywords: Array<{ content: string; type: string }>;
+}
+
+/**
+ * Fetches an AI-generated transcript + summary for a recorded call. Only
+ * populated for dialer-recorded calls (status 2 = finished processing) — a
+ * manually logged call with no recording will 404 or return an empty
+ * summary. Per-call, not per-lead, so it's not part of fetchLeadProfile's
+ * batch fetch; callers pass a callRecordId pulled from /v1.0/calls.
+ */
+export async function getCallSummary(callRecordId: string): Promise<CallSummary | null> {
+  const headers = getLoftyHeaders();
+  const response = await fetchJson<{ data: CallSummary | null }>(
+    `https://api.lofty.com/v2.0/ai/call-summary?callRecordId=${callRecordId}`,
+    headers,
+    { data: null },
+  );
+  return response.data;
 }
 
 // Lofty rejects limit values above 100 (errorCode=20042 "Limit must be between 1 and 100"),
