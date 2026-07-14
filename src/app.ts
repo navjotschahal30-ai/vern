@@ -438,5 +438,8 @@ app.get('/daily-report', async (req: Request, res: Response) => {
   }
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Vern listening on port ${port}`));
+const port = Number(process.env.PORT) || 3000;
+// Explicit 0.0.0.0 (not Node's default :: dual-stack) — Railway's proxy
+// couldn't reach the app without this, causing intermittent "Application
+// failed to respond" 502s that varied by which node the container landed on.
+app.listen(port, '0.0.0.0', () => console.log(`Vern listening on port ${port}`));
