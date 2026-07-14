@@ -10,7 +10,7 @@ jobs:
     steps:
       - name: Trigger /cadence/daily
         run: |
-          response=$(curl -s -w "\n%{http_code}" -X POST https://vern-production.up.railway.app/cadence/daily)
+          response=$(curl -s -w "\n%{http_code}" -X POST https://vern-yhdd.onrender.com/cadence/daily)
           status=$(echo "$response" | tail -n1)
           body=$(echo "$response" | sed '$d')
           echo "HTTP status: $status"
