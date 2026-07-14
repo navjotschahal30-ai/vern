@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: vern
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: AGENT_NAME
+        sync: false
+      - key: AGENT_PHONE
+        sync: false
+      - key: AGENT_WEBSITE
+        sync: false
+      - key: CONTENT_AGENT_URL
+        sync: false
+      - key: CRM_TYPE
+        sync: false
+      - key: DAILY_ROSTER_BATCH_SIZE
+        sync: false
+      - key: EMAIL_LOG_DB_PATH
+        sync: false
+      - key: LOFTY_API_KEY
+        sync: false
+      - key: LOFTY_TEAM_ID
+        sync: false
+      - key: LOFTY_USER_ID
+        sync: false
+      - key: LOG_LEVEL
+        sync: false
+      - key: TEST_MODE
+        sync: false
