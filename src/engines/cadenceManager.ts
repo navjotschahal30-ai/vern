@@ -1,5 +1,5 @@
 import { qualifyLead, LeadQualification } from './qualificationEngine';
-import { getLeadState, tagLeadByQualification, recordOutreach } from './stateEngine';
+import { getLeadState, tagLeadByQualification, recordOutreach, syncActivityNote } from './stateEngine';
 import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logComplianceSkip, OutreachHistory } from '../config/compliance';
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
 import { LeadProfile } from '../schemas/leadProfile';
@@ -262,6 +262,24 @@ export interface ExecuteCadenceResult {
  * DetailedDecision.timingNote) — so this still has to check sendAfter
  * itself before sending, or every cap would be bypassed on execution.
  */
+/**
+ * Renders Vern's current tag-tracked state (status, last-contact
+ * timestamps) plus this run's specific action into a single note, so the
+ * lead's timeline shows one up-to-date summary instead of a note per
+ * cadence run. Best-effort — syncActivityNote already swallows its own
+ * errors rather than throwing, so a Lofty notes-API hiccup can't fail an
+ * otherwise-successful send.
+ */
+async function syncLeadActivityNote(leadId: string, status: LeadQualification['status'], lastAction: string): Promise<void> {
+  const state = await getLeadState(leadId);
+  await syncActivityNote(leadId, [
+    `Status: ${status.toUpperCase()}`,
+    `Last email: ${state.lastEmailAt ?? 'never'}`,
+    `Last SMS: ${state.lastSmsAt ?? 'never'}`,
+    `Most recent action: ${lastAction}`,
+  ]);
+}
+
 export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceResult> {
   const { scheduled, skipped } = await buildCadenceDetailed(leadIds);
 
@@ -292,6 +310,11 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
           sent: false,
           reason: 'Tagged only (SMS outreach paused — email-only rollout)',
         });
+        await syncLeadActivityNote(
+          decision.leadId,
+          qualification.status,
+          'SMS tagged only (SMS outreach paused — email-only rollout)',
+        );
         continue;
       }
 
@@ -308,6 +331,7 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
         body: result.body,
         reason,
       });
+      await syncLeadActivityNote(decision.leadId, qualification.status, `Email ${result.sent ? 'sent' : 'not sent'} — ${reason}`);
 
       executed.push({
         leadId: decision.leadId,
