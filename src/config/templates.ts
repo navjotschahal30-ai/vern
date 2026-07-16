@@ -274,7 +274,9 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         subtitle: vars.marketData ? `Live residential MLS data — VOW feed` : `A short update, nothing to act on unless you want to`,
         greetingName: vars.firstName,
         city,
-        intro: `Things have shifted a bit in the market lately — worth a quick look at what's new before you decide anything.`,
+        intro: vars.marketData
+          ? `Things have shifted a bit in the market lately — worth a quick look at what's new before you decide anything.`
+          : `Just a quick check-in — happy to pull current numbers for ${escapeHtml(city)} if it'd help while you decide anything.`,
         marketData: vars.marketData,
         ctaLinks: [
           { label: 'Book a call', sublabel: `${agent.website}/appointment`, href: agent.bookingUrl },
