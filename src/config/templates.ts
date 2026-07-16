@@ -186,8 +186,10 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     const md = vars.marketData;
     // Real listing-detail link when we have the Lofty listingId (mls) for
     // the viewed property; falls back to the general search page rather
-    // than a broken/guessed URL if we don't.
-    const listingHref = vars.propertyListing
+    // than a broken/guessed URL if we don't. Guard on `.mls` (not just
+    // object presence) in case a caller ever builds propertyListing without
+    // confirming a listingId is present.
+    const listingHref = vars.propertyListing?.mls
       ? buildListingDetailUrl(agent.website, vars.propertyListing)
       : agent.searchUrl;
     return {

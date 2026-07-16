@@ -27,11 +27,19 @@ export interface SkippedEmailResult {
 }
 
 function buildTemplateVars(leadProfile: LeadProfile, marketData?: MarketSnapshot): TemplateVars {
-  const viewed = leadProfile.propertiesViewed?.[0];
+  // Lofty's leadPropertyList doesn't always carry a listingId (e.g. properties
+  // synced before the listing was indexed) — prefer the first viewed property
+  // that actually has one so the CTA links to a real page instead of a
+  // broken /listing-detail/<empty>/... URL. Fall back to [0] for the display
+  // label only when nothing in the list has a usable listingId.
+  const linkable = leadProfile.propertiesViewed?.find((property) => property.mls);
+  const viewed = linkable ?? leadProfile.propertiesViewed?.[0];
   return {
     firstName: leadProfile.firstName ?? 'there',
     property: viewed?.address,
-    propertyListing: viewed ? { mls: viewed.mls, address: viewed.address, city: viewed.city, state: viewed.state } : undefined,
+    propertyListing: linkable
+      ? { mls: linkable.mls, address: linkable.address, city: linkable.city, state: linkable.state }
+      : undefined,
     city: resolveLeadAreaCity(leadProfile) ?? undefined,
     marketData,
   };
