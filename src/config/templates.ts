@@ -183,8 +183,10 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
     const propertyLabel = vars.property ?? 'that listing';
     // Real listing-detail link when we have the Lofty listingId (mls) for
     // the viewed property; falls back to the general search page rather
-    // than a broken/guessed URL if we don't.
-    const listingHref = vars.propertyListing
+    // than a broken/guessed URL if we don't. Guard on `.mls` (not just
+    // object presence) in case a caller ever builds propertyListing without
+    // confirming a listingId is present.
+    const listingHref = vars.propertyListing?.mls
       ? buildListingDetailUrl(agent.website, vars.propertyListing)
       : agent.searchUrl;
     return {
@@ -206,6 +208,11 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   facebook_buyer_warm: (vars) => {
     const agent = getAgentIdentity();
     const city = vars.city ?? 'your search area';
+    // Same real-listing-over-generic-link preference as website_buyer_hot:
+    // link straight to the property the lead actually viewed when we have
+    // a Lofty listingId for it, rather than sending them to a cold search.
+    const hasListing = Boolean(vars.propertyListing?.mls);
+    const listingHref = vars.propertyListing?.mls ? buildListingDetailUrl(agent.website, vars.propertyListing) : agent.searchUrl;
     return {
       subject: `${city} update`,
       body: heroEmail({
@@ -215,8 +222,8 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
           `${escapeHtml(city)} has had some quiet movement lately worth a look, closer to what you were originally searching for than what's on the surface right now.`,
           `No pressure to book anything — take a look at what's active right now and reply if any of it's worth a closer look.`,
         ],
-        ctaLabel: 'Browse What\'s New',
-        ctaHref: agent.searchUrl,
+        ctaLabel: hasListing ? 'View This Listing' : "Browse What's New",
+        ctaHref: listingHref,
         afterCta: `Prefer I just send over a short list instead? Reply and I'll put one together.`,
       }),
     };
@@ -224,6 +231,8 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
 
   generic_hot: (vars) => {
     const agent = getAgentIdentity();
+    const hasListing = Boolean(vars.propertyListing?.mls);
+    const listingHref = vars.propertyListing?.mls ? buildListingDetailUrl(agent.website, vars.propertyListing) : agent.bookingUrl;
     return {
       subject: 'Worth a look right now',
       body: heroEmail({
@@ -233,8 +242,9 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
           `A few places on the market right now fit exactly what you've been after. Homes matching your search criteria aren't sitting long at the moment.`,
           `Want first look before they're gone? A short call is the fastest way to get you something useful.`,
         ],
-        ctaLabel: 'Book a 10-Minute Call',
-        ctaHref: agent.bookingUrl,
+        ctaLabel: hasListing ? 'View This Listing' : 'Book a 10-Minute Call',
+        ctaHref: listingHref,
+        afterCta: hasListing ? `Prefer to just talk it through? Reply with a good time and I'll call — ${escapeHtml(agent.phone)}.` : undefined,
       }),
     };
   },
@@ -242,6 +252,12 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   ghost_reactivation: (vars) => {
     const agent = getAgentIdentity();
     const city = vars.city ?? vars.marketData?.city ?? 'your area';
+    // Lead a warm/cold nurture email with the actual property they looked at
+    // (when we have one) ahead of the generic booking/search CTAs — a real
+    // listing they recognize beats a cold search link every time.
+    const featuredListing = vars.propertyListing?.mls
+      ? [{ label: 'Featured Listing', sublabel: vars.propertyListing.address, href: buildListingDetailUrl(agent.website, vars.propertyListing) }]
+      : [];
     return {
       subject: `The ${city} numbers — what they mean for you`,
       body: reportEmail({
@@ -253,6 +269,7 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         intro: `It's been a while, so I pulled the current numbers for ${escapeHtml(city)} rather than just checking in empty-handed. Here's what's actually happening.`,
         marketData: vars.marketData,
         ctaLinks: [
+          ...featuredListing,
           { label: 'Book a call', sublabel: `${agent.website}/appointment`, href: agent.bookingUrl },
           { label: 'Seller strategy', sublabel: `${agent.website}/sell`, href: `https://${agent.website}/sell` },
           { label: 'Search active listings', sublabel: `${agent.website}/listing`, href: `https://${agent.website}/listing` },
@@ -264,6 +281,9 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   generic_warm: (vars) => {
     const agent = getAgentIdentity();
     const city = vars.city ?? vars.marketData?.city ?? 'your area';
+    const featuredListing = vars.propertyListing?.mls
+      ? [{ label: 'Featured Listing', sublabel: vars.propertyListing.address, href: buildListingDetailUrl(agent.website, vars.propertyListing) }]
+      : [];
     return {
       subject: 'A quick market update',
       body: reportEmail({
@@ -275,6 +295,7 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         intro: `Things have shifted a bit in the market lately — worth a quick look at what's new before you decide anything.`,
         marketData: vars.marketData,
         ctaLinks: [
+          ...featuredListing,
           { label: 'Book a call', sublabel: `${agent.website}/appointment`, href: agent.bookingUrl },
           { label: 'Search active listings', sublabel: `${agent.website}/listing`, href: `https://${agent.website}/listing` },
         ],
@@ -285,6 +306,9 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   generic_cold: (vars) => {
     const agent = getAgentIdentity();
     const city = vars.city ?? vars.marketData?.city ?? 'your area';
+    const featuredListing = vars.propertyListing?.mls
+      ? [{ label: 'Featured Listing', sublabel: vars.propertyListing.address, href: buildListingDetailUrl(agent.website, vars.propertyListing) }]
+      : [];
     return {
       subject: 'A few fresh listings',
       body: reportEmail({
@@ -295,7 +319,10 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         city,
         intro: `A couple of fresh listings line up with what you'd looked at before. No pressure either way — just flagging them in case the timing's better now.`,
         marketData: vars.marketData,
-        ctaLinks: [{ label: 'Search active listings', sublabel: `${agent.website}/listing`, href: `https://${agent.website}/listing` }],
+        ctaLinks: [
+          ...featuredListing,
+          { label: 'Search active listings', sublabel: `${agent.website}/listing`, href: `https://${agent.website}/listing` },
+        ],
       }),
     };
   },
