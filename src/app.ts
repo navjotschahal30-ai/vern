@@ -6,7 +6,7 @@ import { handleLoftyWebhook, fetchAssignedLeadIds, fetchLeadProfile, LoftyRateLi
 import { executeCadence, SkippedLead, ExecutedEntry } from './engines/cadenceManager';
 import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
-import { updateLeadState } from './engines/stateEngine';
+import { updateLeadState, clearQualificationTags } from './engines/stateEngine';
 import { getRecentEmails, getEmailsForLead, getEmailById } from './store/emailLog';
 
 dotenv.config();
@@ -58,10 +58,16 @@ app.post('/cadence', async (req: Request, res: Response) => {
 
 const LOFTY_USER_ID = process.env.LOFTY_USER_ID || '844770719757219';
 
-// Mirrors CRM Agent's daily roster logic: qualify the full assigned book,
-// then take only the top-scoring leads per tier rather than contacting
-// everyone every day.
+// Qualify only the top-scoring leads per tier rather than contacting
+// everyone every cycle.
 const DAILY_ROSTER_CAPS: Record<'hot' | 'warm' | 'ghost', number> = { hot: 10, warm: 20, ghost: 20 };
+
+// Each cycle draws its scoring pool from the ROTATION_POOL_SIZE leads that
+// have gone longest since Vern last tagged them (see sweepAndRankByStaleness
+// below) rather than always the same fixed slice of the assigned book — so
+// the ~50 that end up selected actually rotate across the full book over
+// time instead of re-picking the same names every cycle.
+const ROTATION_POOL_SIZE = 200;
 
 // Throttles the qualification pass — fetching+qualifying all 681 leads at
 // once would fire ~4000 concurrent Lofty requests. Batches of this size run
@@ -240,6 +246,41 @@ async function buildDailyRoster(leadIds: string[]): Promise<{ selected: string[]
   return { selected: selected.map((candidate) => candidate.leadId), skipped };
 }
 
+interface LeadStaleness {
+  leadId: string;
+  lastEvaluatedAt: string | null;
+}
+
+/**
+ * Clears every lead's classification tags (VERN-QUAL-*, VERN-STATE:) across
+ * the full assigned book before this cycle's fresh tagging pass runs — so a
+ * lead that doesn't get re-selected this time shows no stale hot/warm/ghost
+ * label instead of an outdated one. Returns each lead's prior VERN-LAST-EVAL
+ * timestamp (null if never tagged) so the caller can rank by staleness.
+ * Batched the same way as the qualification pass, for the same rate-limit
+ * reasons.
+ */
+async function sweepAndRankByStaleness(allLeadIds: string[]): Promise<LeadStaleness[]> {
+  return mapInBatches(allLeadIds, (batch) =>
+    Promise.all(
+      batch.map(async (leadId) => {
+        const { lastEvaluatedAt } = await clearQualificationTags(leadId);
+        return { leadId, lastEvaluatedAt };
+      }),
+    ),
+  );
+}
+
+/** Never-tagged leads (lastEvaluatedAt === null) sort first, then oldest-tagged first. */
+function selectStalestPool(ranked: LeadStaleness[], poolSize: number): string[] {
+  const sorted = [...ranked].sort((a, b) => {
+    const aTime = a.lastEvaluatedAt ? new Date(a.lastEvaluatedAt).getTime() : -Infinity;
+    const bTime = b.lastEvaluatedAt ? new Date(b.lastEvaluatedAt).getTime() : -Infinity;
+    return aTime - bTime;
+  });
+  return sorted.slice(0, poolSize).map((entry) => entry.leadId);
+}
+
 /**
  * Qualifies every assigned lead and writes the resulting VERN-STATE tag
  * (hot/warm/ghost/blocked) without sending any SMS/email — a dry run for
@@ -345,14 +386,24 @@ const dailyCadenceJobs = new Map<string, DailyCadenceJob>();
 
 /**
  * The actual /cadence/daily work, run detached from the request so a slow
- * Lofty pass (top 50 leads, rate-limit backoff included) can't trip Railway's
+ * Lofty pass (rate-limit backoff included) can't trip the platform's
  * gateway timeout. Failures are caught here and recorded on the job rather
  * than thrown — there's no request left to propagate them to.
+ *
+ * Runs against the full assigned book each cycle, not a fixed slice:
+ * 1. Clear every lead's classification tags (sweepAndRankByStaleness)
+ *    and read back each lead's last-tagged timestamp.
+ * 2. Pull the ROTATION_POOL_SIZE leads that have gone longest without being
+ *    tagged into this cycle's scoring pool.
+ * 3. Score that pool and cap-select per DAILY_ROSTER_CAPS, same as before.
  */
 async function runDailyCadenceJob(jobId: string): Promise<void> {
   try {
-    const leadIds = (await fetchAssignedLeadIds(LOFTY_USER_ID)).slice(0, 50);
-    const { selected, skipped: rosterSkipped } = await buildDailyRoster(leadIds);
+    const allLeadIds = await fetchAssignedLeadIds(LOFTY_USER_ID);
+    const ranked = await sweepAndRankByStaleness(allLeadIds);
+    const pool = selectStalestPool(ranked, ROTATION_POOL_SIZE);
+
+    const { selected, skipped: rosterSkipped } = await buildDailyRoster(pool);
     const { executed, skipped: executionSkipped } = await executeCadence(selected);
 
     dailyCadenceJobs.set(jobId, {

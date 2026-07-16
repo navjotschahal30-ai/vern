@@ -289,19 +289,23 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
   const now = new Date();
 
   for (const decision of scheduled) {
-    if (decision.sendAfter.getTime() > now.getTime()) {
-      allSkipped.push({
-        leadId: decision.leadId,
-        reason: `Delayed until ${decision.sendAfter.toISOString()}${decision.timingNote ? ` (${decision.timingNote})` : ''}`,
-      });
-      continue;
-    }
-
     try {
       const leadProfile = await fetchLeadProfile(decision.leadId);
       const qualification = qualifyLead(leadProfile);
 
+      // Refresh this lead's hot/warm/ghost tag regardless of whether it's
+      // also eligible to send today — a CASL cooldown should delay
+      // outreach, not leave the lead's classification stale in Lofty until
+      // its next cooldown-free cycle.
       await tagLeadByQualification(decision.leadId, qualification);
+
+      if (decision.sendAfter.getTime() > now.getTime()) {
+        allSkipped.push({
+          leadId: decision.leadId,
+          reason: `Delayed until ${decision.sendAfter.toISOString()}${decision.timingNote ? ` (${decision.timingNote})` : ''}`,
+        });
+        continue;
+      }
 
       if (decision.channel === 'sms') {
         executed.push({
