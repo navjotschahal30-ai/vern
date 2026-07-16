@@ -19,6 +19,8 @@ const VERN_STATE_PREFIX = 'VERN-STATE:';
 const VERN_LAST_SMS_PREFIX = 'VERN-LAST-SMS:';
 const VERN_LAST_EMAIL_PREFIX = 'VERN-LAST-EMAIL:';
 const VERN_CONTACTED_TODAY_TAG = 'VERN-CONTACTED-TODAY';
+const VERN_QUAL_PREFIX = 'VERN-QUAL-';
+const VERN_LAST_EVAL_PREFIX = 'VERN-LAST-EVAL:';
 
 // Marks Vern's own status note so syncActivityNote can find and replace it
 // without ever touching a real note a human wrote — the API key writes as
@@ -101,9 +103,36 @@ export async function tagLeadByQualification(leadId: string, qualification: Lead
   const tags = lead.tags || [];
 
   const qualificationTag = `VERN-QUAL-${qualification.status.toUpperCase()}`;
-  const updatedTags = replaceTagsWithPrefix(tags, 'VERN-QUAL-', qualificationTag);
+  let updatedTags = replaceTagsWithPrefix(tags, VERN_QUAL_PREFIX, qualificationTag);
+  // Stamped in the same write as the classification tag (not a separate
+  // API call) — clearQualificationTags() below reads this to rank leads by
+  // staleness so each rotation favors whoever hasn't been tagged recently.
+  updatedTags = replaceTagsWithPrefix(updatedTags, VERN_LAST_EVAL_PREFIX, `${VERN_LAST_EVAL_PREFIX}${new Date().toISOString()}`);
 
   await writeLeadTags(leadId, updatedTags);
+}
+
+/**
+ * Strips a lead's classification tags (VERN-QUAL-*, VERN-STATE:) and
+ * returns its previous VERN-LAST-EVAL timestamp (null if Vern has never
+ * tagged it). Used ahead of a fresh tagging pass so a lead that falls out
+ * of this cycle's rotation doesn't keep a stale hot/warm/ghost label
+ * forever, and so the caller can rank the full book by staleness to decide
+ * who gets re-evaluated next. VERN-LAST-EVAL itself is left untouched here
+ * — it only advances when tagLeadByQualification actually re-tags a lead.
+ * Skips the write entirely when nothing needs to change.
+ */
+export async function clearQualificationTags(leadId: string): Promise<{ lastEvaluatedAt: string | null }> {
+  const tags = await fetchLeadTags(leadId);
+  const lastEvaluatedAt = parseTagValue(tags, VERN_LAST_EVAL_PREFIX);
+
+  const cleaned = tags.filter((tag) => !tag.startsWith(VERN_QUAL_PREFIX) && !tag.startsWith(VERN_STATE_PREFIX));
+
+  if (cleaned.length !== tags.length) {
+    await writeLeadTags(leadId, cleaned);
+  }
+
+  return { lastEvaluatedAt };
 }
 
 /**

@@ -1,8 +1,13 @@
-name: Daily Cadence
+name: Cadence (every 3 days)
 
 on:
   schedule:
-    - cron: '0 13 * * 1-5' # 9am ET, Mon-Fri
+    # 9am ET, every ~3 days. GitHub Actions cron has no native "every N days"
+    # interval — this fires when day-of-month % 3 == 0, which drifts by a
+    # day at most around month boundaries. No longer weekday-only: this now
+    # also runs the pool-refresh/tag-sweep (see app.ts), not just sends, so
+    # skipping weekends would skip evaluation too, not just outreach.
+    - cron: '0 13 */3 * *'
   workflow_dispatch: {} # lets a missed/delayed schedule run be triggered by hand from Actions or `gh workflow run`
 
 jobs:
