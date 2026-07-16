@@ -128,7 +128,7 @@ const MARKET_TYPE_LABEL: Record<MarketSnapshot['marketType'], string> = {
 
 function marketHeadline(marketData: MarketSnapshot | undefined, cityFallback: string): string {
   if (!marketData) {
-    return `Here's what's actually moving in ${escapeHtml(cityFallback)} right now, and what it means if you're buying or selling.`;
+    return `Whenever you're ready, I can pull exactly what's moving in ${escapeHtml(cityFallback)} right now — and what it means if you're buying or selling.`;
   }
   const typeLabel = MARKET_TYPE_LABEL[marketData.marketType] ?? 'market';
   return (
@@ -250,7 +250,9 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         subtitle: vars.marketData ? `Live residential MLS data — VOW feed` : `A quick check-in on ${escapeHtml(city)} since we last talked`,
         greetingName: vars.firstName,
         city,
-        intro: `It's been a while, so I pulled the current numbers for ${escapeHtml(city)} rather than just checking in empty-handed. Here's what's actually happening.`,
+        intro: vars.marketData
+          ? `It's been a while, so I pulled the current numbers for ${escapeHtml(city)} rather than just checking in empty-handed. Here's what's actually happening.`
+          : `It's been a while, so I wanted to check in rather than let things go quiet.`,
         marketData: vars.marketData,
         ctaLinks: [
           { label: 'Book a call', sublabel: `${agent.website}/appointment`, href: agent.bookingUrl },
