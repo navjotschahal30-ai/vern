@@ -8,6 +8,8 @@ import { qualifyLead, LeadQualification } from './engines/qualificationEngine';
 import { generateDailyCommandCenter } from './engines/dailyCommandCenter';
 import { updateLeadState } from './engines/stateEngine';
 import { getRecentEmails, getEmailsForLead, getEmailById } from './store/emailLog';
+import { getAgentIdentity, buildListingDetailUrl } from './config/emailBrand';
+import { resolveListingsByMls } from './config/loftyListingLookup';
 
 dotenv.config();
 
@@ -22,6 +24,48 @@ function sendError(res: Response, error: unknown): void {
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
+});
+
+// Manual/ad hoc tool: given one or more MLS board numbers (comma-separated),
+// resolve each to its live navjotchahal.ca listing-detail link via Lofty's
+// GET /v1.0/listing?mlsListingIds=... — no need to search the site by hand
+// and copy the URL. e.g. GET /listing-link?mls=W13533604,W13124616
+app.get('/listing-link', async (req: Request, res: Response) => {
+  try {
+    const mlsParam = req.query.mls;
+    const mlsListingIds =
+      typeof mlsParam === 'string'
+        ? mlsParam.split(',').map((id) => id.trim()).filter(Boolean)
+        : [];
+
+    if (mlsListingIds.length === 0) {
+      res.status(400).json({ error: 'mls query param is required (comma-separated MLS numbers)', code: 400 });
+      return;
+    }
+
+    const agent = getAgentIdentity();
+    const resolved = await resolveListingsByMls(mlsListingIds);
+
+    const links: Record<string, string> = {};
+    const notFound: string[] = [];
+    for (const mls of mlsListingIds) {
+      const listing = resolved.get(mls);
+      if (!listing) {
+        notFound.push(mls);
+        continue;
+      }
+      links[mls] = buildListingDetailUrl(agent.website, {
+        mls: listing.listingId,
+        address: listing.address,
+        city: listing.city,
+        state: listing.state,
+      });
+    }
+
+    res.json({ links, notFound });
+  } catch (error) {
+    sendError(res, error);
+  }
 });
 
 // Lofty has one webhook URL covering every event type it sends. A "lead
