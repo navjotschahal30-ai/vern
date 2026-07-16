@@ -2,7 +2,7 @@ import { qualifyLead, LeadQualification } from './qualificationEngine';
 import { getLeadState, tagLeadByQualification, recordOutreach, syncActivityNote } from './stateEngine';
 import { checkHardViolations, checkTimingViolations, getNextValidSendTime, logComplianceSkip, OutreachHistory } from '../config/compliance';
 import { fetchLeadProfile } from '../handlers/loftyWebhookHandler';
-import { LeadProfile } from '../schemas/leadProfile';
+import { LeadProfile, resolveLeadAreaCity } from '../schemas/leadProfile';
 import { MarketSnapshot } from '../schemas/marketSnapshot';
 import { TemplateKey } from '../config/templates';
 import { sendEmail } from '../outreach/emailExecutor';
@@ -20,6 +20,7 @@ async function fetchMarketData(
   propertyType: string | null = null,
 ): Promise<MarketSnapshot | null> {
   if (!city) {
+    console.warn('[market] No resolvable city for lead — skipping market data fetch, template will use placeholder copy');
     return null;
   }
 
@@ -322,8 +323,19 @@ export async function executeCadence(leadIds: string[]): Promise<ExecuteCadenceR
         continue;
       }
 
-      const marketData = await fetchMarketData(leadProfile.currentHomeAddress?.city || null);
+      const marketData = await fetchMarketData(resolveLeadAreaCity(leadProfile));
       const result = await sendEmail(leadProfile, qualification, marketData ?? undefined);
+
+      if ('noData' in result) {
+        // Nothing was rendered or sent — don't record this as an outreach
+        // touch (that would push the lead's next eligible send further out
+        // via the frequency cap) and don't log a fabricated subject/body.
+        // Treat it like a timing skip so the lead is picked up again next
+        // cycle once real data resolves.
+        allSkipped.push({ leadId: decision.leadId, reason: `No data: ${result.reason}` });
+        continue;
+      }
+
       const reason = result.sent ? decision.reason : 'Test mode: skipped — not Navjot';
 
       await recordOutreach(decision.leadId, 'email');

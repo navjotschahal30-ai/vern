@@ -430,6 +430,20 @@ function computeEngagement(touchHistory: TouchEvent[]): LeadEngagement {
  * text history, and activity timeline into the LeadProfile contract
  * consumed by downstream agents.
  */
+/**
+ * Best-available "area" city for market-data lookups and email/SMS copy.
+ * `currentHomeAddress.city` is only populated for leads with a known home
+ * (mostly sellers) — most buyer/web leads have it null, so fall back to the
+ * city of a property they've actually viewed before giving up entirely.
+ */
+export function resolveLeadAreaCity(leadProfile: Pick<LeadProfile, 'currentHomeAddress' | 'propertiesViewed'>): string | null {
+  return (
+    leadProfile.currentHomeAddress?.city ||
+    leadProfile.propertiesViewed?.find((property) => property.city)?.city ||
+    null
+  );
+}
+
 export function normalizeLeadProfile(
   loftyLead: LoftyLead,
   notes: LoftyNote[],

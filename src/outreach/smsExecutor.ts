@@ -1,4 +1,4 @@
-import { LeadProfile } from '../schemas/leadProfile';
+import { LeadProfile, resolveLeadAreaCity } from '../schemas/leadProfile';
 import { LeadQualification } from '../engines/qualificationEngine';
 import { SMS_TEMPLATES, selectTemplateKey, TemplateVars } from '../config/templates';
 import { MarketSnapshot } from '../schemas/marketSnapshot';
@@ -20,7 +20,7 @@ function buildTemplateVars(leadProfile: LeadProfile, marketData?: MarketSnapshot
   return {
     firstName: leadProfile.firstName ?? 'there',
     property: leadProfile.propertiesViewed?.[0]?.address,
-    city: leadProfile.currentHomeAddress?.city || undefined,
+    city: resolveLeadAreaCity(leadProfile) ?? undefined,
     marketData,
   };
 }
