@@ -3,6 +3,7 @@ name: Daily Cadence
 on:
   schedule:
     - cron: '0 13 * * 1-5' # 9am ET, Mon-Fri
+  workflow_dispatch: {} # lets a missed/delayed schedule run be triggered by hand from Actions or `gh workflow run`
 
 jobs:
   trigger-cadence:
