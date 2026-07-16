@@ -80,6 +80,7 @@ function heroEmail(opts: {
   eyebrow: string;
   titleHtml: string;
   paragraphs: string[];
+  metricCards?: MetricCard[];
   ctaLabel: string;
   ctaHref: string;
   afterCta?: string;
@@ -88,6 +89,7 @@ function heroEmail(opts: {
     heroHeader({ eyebrow: opts.eyebrow, titleHtml: opts.titleHtml }) +
     `<tr><td style="padding:36px 40px; color:${'#001D3D'};">` +
     opts.paragraphs.map((p) => paragraph(p)).join('') +
+    (opts.metricCards?.length ? metricCardRow(opts.metricCards) : '') +
     ctaButton({ label: opts.ctaLabel, href: opts.ctaHref }) +
     (opts.afterCta ? paragraph(opts.afterCta, { muted: true, size: 13 }) : '') +
     `</td></tr>` +
@@ -181,6 +183,7 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
   website_buyer_hot: (vars) => {
     const agent = getAgentIdentity();
     const propertyLabel = vars.property ?? 'that listing';
+    const md = vars.marketData;
     // Real listing-detail link when we have the Lofty listingId (mls) for
     // the viewed property; falls back to the general search page rather
     // than a broken/guessed URL if we don't.
@@ -193,9 +196,12 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
         eyebrow: 'Following Up',
         titleHtml: `${escapeHtml(propertyLabel)} is still worth a look, ${escapeHtml(vars.firstName)}.`,
         paragraphs: [
-          `I saw you viewed <strong>${escapeHtml(propertyLabel)}</strong> and wanted to reach out directly. It's priced right for what's moving right now, and homes like it aren't sitting long.`,
+          md
+            ? `Not sure if you're still interested, but I wanted to share <strong>${escapeHtml(propertyLabel)}</strong> with you. Homes like it in ${escapeHtml(md.city)} are averaging just ${md.daysOnMarket} days on market right now, so it's worth acting on while it's still available.`
+            : `Not sure if you're still interested, but I wanted to share <strong>${escapeHtml(propertyLabel)}</strong> with you.`,
           `Take another look while it's still available — I can also line up something similar if it's no longer a fit.`,
         ],
+        metricCards: marketMetricCards(md),
         ctaLabel: 'View This Listing',
         ctaHref: listingHref,
         afterCta: `Prefer to talk it through first? Reply with a good time and I'll call — ${escapeHtml(agent.phone)}.`,
@@ -205,16 +211,22 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
 
   facebook_buyer_warm: (vars) => {
     const agent = getAgentIdentity();
-    const city = vars.city ?? 'your search area';
+    const md = vars.marketData;
+    const city = vars.city ?? md?.city ?? 'your search area';
     return {
       subject: `${city} update`,
       body: heroEmail({
         eyebrow: 'Worth A Look',
-        titleHtml: `${escapeHtml(city)} has moved a bit, ${escapeHtml(vars.firstName)}.`,
+        titleHtml: md
+          ? `${escapeHtml(city)} is moving, ${escapeHtml(vars.firstName)}.`
+          : `${escapeHtml(city)} update, ${escapeHtml(vars.firstName)}.`,
         paragraphs: [
-          `${escapeHtml(city)} has had some quiet movement lately worth a look, closer to what you were originally searching for than what's on the surface right now.`,
+          md
+            ? `${escapeHtml(city)} has ${md.activeListings} active listings and ${md.soldLast30Days} sales in the last 30 days — closer to what you were originally searching for than what's on the surface right now.`
+            : `Been meaning to check back in on ${escapeHtml(city)} for you — happy to pull the latest numbers if it'd help.`,
           `No pressure to book anything — take a look at what's active right now and reply if any of it's worth a closer look.`,
         ],
+        metricCards: marketMetricCards(md),
         ctaLabel: 'Browse What\'s New',
         ctaHref: agent.searchUrl,
         afterCta: `Prefer I just send over a short list instead? Reply and I'll put one together.`,
@@ -224,15 +236,22 @@ export const EMAIL_TEMPLATES: Record<TemplateKey, EmailTemplate> = {
 
   generic_hot: (vars) => {
     const agent = getAgentIdentity();
+    const md = vars.marketData;
+    const city = vars.city ?? md?.city;
     return {
       subject: 'Worth a look right now',
       body: heroEmail({
         eyebrow: 'Inventory Moving',
-        titleHtml: `Inventory's moving fast, ${escapeHtml(vars.firstName)}.`,
+        titleHtml: md
+          ? `Inventory's moving fast in ${escapeHtml(city ?? 'your area')}, ${escapeHtml(vars.firstName)}.`
+          : `Worth a look right now, ${escapeHtml(vars.firstName)}.`,
         paragraphs: [
-          `A few places on the market right now fit exactly what you've been after. Homes matching your search criteria aren't sitting long at the moment.`,
+          md
+            ? `A few places fit exactly what you've been after, and with just ${md.daysOnMarket} average days on market${city ? ` in ${escapeHtml(city)}` : ''}, homes matching your search criteria aren't sitting long.`
+            : `A few places on the market right now likely fit what you've been after based on your search criteria.`,
           `Want first look before they're gone? A short call is the fastest way to get you something useful.`,
         ],
+        metricCards: marketMetricCards(md),
         ctaLabel: 'Book a 10-Minute Call',
         ctaHref: agent.bookingUrl,
       }),
