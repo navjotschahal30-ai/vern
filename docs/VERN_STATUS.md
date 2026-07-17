@@ -76,7 +76,7 @@
 - **LLM-generated SMS/email copy** — current templates are static, keyed by source + intent + status (`src/config/templates.ts`), not generated per-lead by a model.
 - **Intake Agent** — for leads that don't originate from the website form (e.g. phone-in, referral, open-house sign-in); Vern currently assumes Lofty-normalized lead data is already present.
 - **WhatsApp broadcast strategy** — no WhatsApp channel exists yet; SMS and email via Lofty are the only outreach channels.
-- **Voice input for Aria** — no voice/call-transcript ingestion path exists; touch history only reflects what Lofty logs from calls/notes, not live voice interaction.
+- **Voice input for Mosaic Intelligence** — no voice/call-transcript ingestion path exists; touch history only reflects what Lofty logs from calls/notes, not live voice interaction.
 
 ---
 

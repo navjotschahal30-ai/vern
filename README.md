@@ -94,7 +94,7 @@ Add:
 ### Not Yet Done
 - Email domain config (`teamMosaic.ca` SPF/DKIM)
 - SMS via Twilio
-- Aria SMS integration
+- Mosaic Intelligence SMS integration
 
 ## License
 

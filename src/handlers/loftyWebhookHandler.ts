@@ -141,7 +141,7 @@ export async function fetchLeadProfile(leadId: string): Promise<LeadProfile> {
 }
 
 /**
- * Entry point all downstream agents (Aria, IDX Stalker, CRM Agent) call.
+ * Entry point all downstream agents (Mosaic Intelligence, IDX Stalker, CRM Agent) call.
  *
  * Receives a Lofty "lead updated" webhook payload and returns the
  * normalized LeadProfile those agents consume.

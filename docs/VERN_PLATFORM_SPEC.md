@@ -88,7 +88,7 @@ This document is the canonical architecture reference. It should be detailed eno
 
 ### 1.5 Content Agent (Market Intelligence)
 
-A dedicated agent, separate from the per-lead conversational Vern persona, that owns all market-data ingestion and derived content (CMAs, market reports, trend signals). It runs on its own schedule rather than in the per-message request path, and its outputs feed both Vern (qualification scoring) and Aria (intake conversation) rather than talking to leads directly.
+A dedicated agent, separate from the per-lead conversational Vern persona, that owns all market-data ingestion and derived content (CMAs, market reports, trend signals). It runs on its own schedule rather than in the per-message request path, and its outputs feed both Vern (qualification scoring) and Mosaic Intelligence (intake conversation) rather than talking to leads directly.
 
 #### Responsibilities
 
@@ -108,12 +108,12 @@ A dedicated agent, separate from the per-lead conversational Vern persona, that 
 - Market reports by neighborhood (JSON)
 - CMAs (PDF, email-ready)
 - Trend signals for Vern qualification
-- Conversation data for Aria
+- Conversation data for Mosaic Intelligence
 
 #### Integration
 
 - **Vern**: uses market data to boost hot lead scores
-- **Aria**: mentions market trends during intake
+- **Mosaic Intelligence**: mentions market trends during intake
 - **Agent**: requests CMAs for leads, shares in calls
 
 #### CMA request flow
@@ -140,9 +140,9 @@ Nightly, Content Agent:
 
 This keeps all agents using fresh, localized market data.
 
-### 1.6 Aria Agent (Intake)
+### 1.6 Mosaic Intelligence (Intake)
 
-Aria is the intake agent for leads that don't arrive pre-normalized from a website form — phone-in calls, referrals, open-house sign-ins. It runs a live voice/conversation flow to capture the same structured fields a web form would have provided, then hands the normalized lead off to Vern's qualification FSM (Section 5). Aria does not itself qualify or run outreach cadences — it produces a `LeadProfile` and stops.
+Mosaic Intelligence is the intake agent for leads that don't arrive pre-normalized from a website form — phone-in calls, referrals, open-house sign-ins. It runs a live voice/conversation flow to capture the same structured fields a web form would have provided, then hands the normalized lead off to Vern's qualification FSM (Section 5). Mosaic Intelligence does not itself qualify or run outreach cadences — it produces a `LeadProfile` and stops.
 
 #### Responsibilities
 
@@ -166,16 +166,16 @@ Aria is the intake agent for leads that don't arrive pre-normalized from a websi
 
 #### Integration
 
-- **Content Agent**: supplies neighborhood trend data Aria references during intake (e.g. "homes in that area have been moving in about 18 days")
-- **Vern**: receives Aria's completed `LeadProfile` and skips re-asking any field Aria already captured
-- **CRM adapters**: Aria creates the lead record via `pushLead()` exactly as a webhook-sourced lead would, so downstream CRM sync logic doesn't need to special-case intake-agent-originated leads
-- **Agent**: notified when Aria completes an intake so they're aware of the new lead before Vern's first outreach goes out
+- **Content Agent**: supplies neighborhood trend data Mosaic Intelligence references during intake (e.g. "homes in that area have been moving in about 18 days")
+- **Vern**: receives Mosaic Intelligence's completed `LeadProfile` and skips re-asking any field it already captured
+- **CRM adapters**: Mosaic Intelligence creates the lead record via `pushLead()` exactly as a webhook-sourced lead would, so downstream CRM sync logic doesn't need to special-case intake-agent-originated leads
+- **Agent**: notified when Mosaic Intelligence completes an intake so they're aware of the new lead before Vern's first outreach goes out
 
 #### Intake flow
 
 ```
 Inbound call/chat with no matching CRM record
-  → Aria starts intake conversation
+  → Mosaic Intelligence starts intake conversation
   → Captures: name, phone, motivation, timeline, financing, budget, location
   → Optionally references Content Agent market signals for the stated area
   → POST /agents/{agentId}/leads  (crm_source: "manual", source_channel: "voice")
@@ -185,7 +185,7 @@ Inbound call/chat with no matching CRM record
 
 #### Status
 
-Not yet built. Voice/call-transcript ingestion and the intake conversation flow are both open work — see `docs/VERN_STATUS.md` Section 5 ("What's NOT Built"). Until Aria exists, leads without a web-form origin are entered manually and start in Vern's qualification FSM at `new`.
+Not yet built. Voice/call-transcript ingestion and the intake conversation flow are both open work — see `docs/VERN_STATUS.md` Section 5 ("What's NOT Built"). Until Mosaic Intelligence exists, leads without a web-form origin are entered manually and start in Vern's qualification FSM at `new`.
 
 ---
 

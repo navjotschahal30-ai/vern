@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // LeadProfile contract
 //
-// This is the shared shape that every downstream agent (Aria, IDX Stalker,
-// CRM Agent, etc.) reads from. It is the normalized, agent-friendly view of
+// This is the shared shape that every downstream agent (Mosaic Intelligence,
+// IDX Stalker, CRM Agent, etc.) reads from. It is the normalized, agent-friendly view of
 // a raw Lofty lead + its notes — nobody downstream should reach back into
 // the raw Lofty payload directly. If Lofty's API shape changes, only
 // normalizeLeadProfile() needs to change; this interface should not.
